@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Test stub for the `codex` CLI. Same behavior contract as the claude stub:
+#   - Reads the prompt (codex takes it as the last positional arg, but the
+#     stub also drains stdin to be defensive).
+#   - Marks the referenced issue `status: done` unless STUB_NO_MARK=1.
+#   - Emits canned codex `exec` output. Override with STUB_FIXTURE=<file>.
+#   - Exits with $STUB_EXIT_CODE (default 0).
+
+set -u
+
+# Drain stdin (defensive — codex doesn't normally read stdin).
+[[ -t 0 ]] || cat >/dev/null
+
+# Codex passes the prompt as the last positional arg. Find it.
+PROMPT=""
+for arg in "$@"; do PROMPT="$arg"; done
+
+if [[ -z "${STUB_NO_MARK:-}" ]]; then
+  ISSUE_PATH="$(printf '%s' "$PROMPT" | grep -oE '/[^[:space:]]*/issues/[^[:space:]]+\.md' | head -n 1)"
+  if [[ -z "$ISSUE_PATH" ]]; then
+    rel="$(printf '%s' "$PROMPT" | grep -oE 'issues/[^[:space:]]+\.md' | head -n 1)"
+    [[ -n "$rel" ]] && ISSUE_PATH="$PWD/$rel"
+  fi
+  if [[ -n "$ISSUE_PATH" && -f "$ISSUE_PATH" ]]; then
+    awk '
+      BEGIN{in_fm=0; replaced=0}
+      /^---$/{in_fm = !in_fm; print; next}
+      in_fm && !replaced && /^status:/{print "status: done"; replaced=1; next}
+      {print}
+    ' "$ISSUE_PATH" > "$ISSUE_PATH.tmp" && mv "$ISSUE_PATH.tmp" "$ISSUE_PATH"
+  fi
+fi
+
+if [[ -n "${STUB_FIXTURE:-}" && -f "${STUB_FIXTURE}" ]]; then
+  cat "${STUB_FIXTURE}"
+else
+  echo "stub codex iteration complete"
+  echo "tokens used: input=1000 output=500"
+fi
+
+exit "${STUB_EXIT_CODE:-0}"

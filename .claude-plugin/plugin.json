@@ -1,0 +1,14 @@
+{
+  "name": "valkyrie",
+  "version": "0.1.0",
+  "description": "Hard-enforced design-first AI coding workflow: grill-me → to-prd → to-issues → tdd, with a stage-aware statusline and a ralph-afk loop runner.",
+  "skills": [
+    "./skills/valk",
+    "./skills/grill-me",
+    "./skills/to-prd",
+    "./skills/to-issues",
+    "./skills/tdd",
+    "./skills/zoom-out",
+    "./skills/refactor-spaghetti"
+  ]
+}

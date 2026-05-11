@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Per-project Valkyrie state — never commit to the Valkyrie repo itself.
+# These appear inside *consumer* projects that use Valkyrie, not here.
+.claude/valk/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Node (for marp tooling if anyone installs it locally)
+node_modules/
+
+# Editor
+.vscode/
+.idea/
+*.swp

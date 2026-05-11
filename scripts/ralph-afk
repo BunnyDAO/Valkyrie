@@ -1,0 +1,640 @@
+#!/usr/bin/env bash
+#
+# ralph-afk — autonomous loop over local issues/ using claude or codex CLI.
+#
+# Inspired by:
+#   - https://www.aihero.dev/getting-started-with-ralph (Matt Pocock)
+#   - https://www.aihero.dev/heres-how-to-stream-claude-code-with-afk-ralph
+#   - https://www.aihero.dev/why-the-anthropic-ralph-plugin-sucks
+#   - Geoffrey Huntley's original Ralph pattern
+#
+# Each iteration:
+#   1. Picks the next unblocked issue from issues/ (open, blocked_by satisfied)
+#   2. Updates the Valkyrie stage marker to AFK
+#   3. Spawns the chosen CLI with a prompt that runs /valk in TDD mode
+#   4. CLI runs with FRESH context (the point — context regenerates per task)
+#   5. After exit, re-reads issues/ to see what got marked done
+#   6. Repeats until: max iterations hit, no unblocked issues left, or Ctrl-C
+#
+# Usage:
+#   ralph-afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
+#
+# Examples:
+#   ralph-afk 10                       # 10 iterations using claude (default)
+#   ralph-afk 10 --cli codex           # same but using codex
+#   ralph-afk 5 --prompt-file pm.md    # override the per-iteration prompt
+
+set -euo pipefail
+
+# --- arg parsing ------------------------------------------------------------
+
+MAX_ITERS=""
+CLI="claude"
+PROMPT_FILE=""
+MAX_HOURS="4"
+MAX_COST_USD="50"
+DEBUG_COST=""
+ALLOW_NO_PRD=""
+ALLOW_DIRTY=""
+ALLOW_DANGEROUS=""
+NO_CONFIRM=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --cli)
+      CLI="$2"; shift 2 ;;
+    --prompt-file)
+      PROMPT_FILE="$2"; shift 2 ;;
+    --max-hours)
+      MAX_HOURS="$2"; shift 2 ;;
+    --max-cost-usd)
+      MAX_COST_USD="$2"; shift 2 ;;
+    --debug-cost)
+      DEBUG_COST="$2"; shift 2 ;;
+    --allow-no-prd)
+      ALLOW_NO_PRD="1"; shift ;;
+    --allow-dirty)
+      ALLOW_DIRTY="1"; shift ;;
+    --i-know-this-is-dangerous)
+      ALLOW_DANGEROUS="1"; shift ;;
+    --no-confirm)
+      NO_CONFIRM="1"; shift ;;
+    -h|--help)
+      sed -n '2,30p' "$0"; exit 0 ;;
+    *)
+      if [ -z "$MAX_ITERS" ]; then
+        MAX_ITERS="$1"
+      else
+        echo "unexpected arg: $1" >&2; exit 2
+      fi
+      shift ;;
+  esac
+done
+
+# --debug-cost is a one-shot diagnostic mode. It bypasses the loop entirely
+# and shells out to cost-helper.py to parse + price a single log file.
+if [ -n "$DEBUG_COST" ]; then
+  exec python3 "$HOME/.claude/valkyrie/cost-helper.py" parse-log "$DEBUG_COST"
+fi
+
+if [ -z "$MAX_ITERS" ]; then
+  echo "usage: ralph-afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>]" >&2
+  exit 2
+fi
+if ! [[ "$MAX_ITERS" =~ ^[0-9]+$ ]]; then
+  echo "max_iterations must be a positive integer" >&2; exit 2
+fi
+# --max-hours: positive number, decimals allowed.
+if ! awk -v h="$MAX_HOURS" 'BEGIN{exit !(h+0 == h && h+0 > 0)}' </dev/null 2>/dev/null; then
+  echo "--max-hours must be a positive number (got: $MAX_HOURS)" >&2; exit 2
+fi
+# --max-cost-usd: positive number, decimals allowed.
+if ! awk -v c="$MAX_COST_USD" 'BEGIN{exit !(c+0 == c && c+0 > 0)}' </dev/null 2>/dev/null; then
+  echo "--max-cost-usd must be a positive number (got: $MAX_COST_USD)" >&2; exit 2
+fi
+case "$CLI" in
+  claude|codex) ;;
+  *) echo "--cli must be 'claude' or 'codex' (got: $CLI)" >&2; exit 2 ;;
+esac
+if ! command -v "$CLI" >/dev/null 2>&1; then
+  echo "error: '$CLI' not on PATH" >&2; exit 2
+fi
+
+# --- env --------------------------------------------------------------------
+
+REPO="$(pwd)"
+ISSUES_DIR="$REPO/issues"
+STAGE_PY="$HOME/.claude/valkyrie/stage.py"
+LOG_DIR="$REPO/.claude/valk/afk-logs"
+CSV_PATH="$REPO/.claude/valk/afk-cost-history.csv"
+mkdir -p "$LOG_DIR"
+
+if [ ! -d "$ISSUES_DIR" ]; then
+  echo "error: no issues/ directory in $REPO. Run /to-issues first." >&2
+  exit 1
+fi
+
+# Time accounting. DEADLINE_TS is the unix timestamp at which --max-hours is up.
+START_TS="$(date +%s)"
+DEADLINE_TS="$(awk -v s="$START_TS" -v h="$MAX_HOURS" 'BEGIN{printf "%d", s + h*3600}')"
+
+# Track exit reason, exit code, and per-run counters for the final summary.
+EXIT_REASON=""
+EXIT_CODE=0
+ITERS_DONE=0
+ROWS_THIS_RUN=0
+CUMULATIVE_COST="0"
+COST_HELPER="$HOME/.claude/valkyrie/cost-helper.py"
+CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,exit_reason_for_run'
+
+# --- helpers ----------------------------------------------------------------
+
+# Pre-flight gate state. Failures and warnings accumulate here; preflight()
+# prints them and either exits (failures) or just narrates (warnings).
+GATE_FAILURES=()
+GATE_WARNINGS=()
+
+# Count unblocked open issues. Mirrors pick_next_issue's selection logic but
+# tallies instead of returning the first match. Used by the punch-list output
+# and by gate_confirm (issue 0010) for the queue summary.
+count_unblocked_open() {
+  local n=0 issue
+  for issue in "$ISSUES_DIR"/*.md; do
+    [ -e "$issue" ] || continue
+    local status blocked_by ok=1 dep dep_file
+    status="$(awk '/^status:/{print $2; exit}' "$issue")"
+    [ "$status" = "open" ] || continue
+    blocked_by="$(awk -F: '/^blocked_by:/{sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$issue")"
+    blocked_by="${blocked_by//[\[\]\"\']/}"
+    blocked_by="$(echo "$blocked_by" | tr ',' ' ')"
+    for dep in $blocked_by; do
+      dep="$(echo "$dep" | tr -d '[:space:]')"
+      [ -z "$dep" ] && continue
+      dep_file="$(find "$ISSUES_DIR" -name "${dep}-*.md" -print -quit 2>/dev/null)"
+      if [ -z "$dep_file" ] || [ "$(awk '/^status:/{print $2; exit}' "$dep_file")" != "done" ]; then
+        ok=0; break
+      fi
+    done
+    [ "$ok" = "1" ] && n=$((n + 1))
+  done
+  echo "$n"
+}
+
+# Pre-flight gate: docs/prd/ must exist and contain at least one non-empty
+# .md file. Override: --allow-no-prd.
+gate_prd_exists() {
+  if [ "$ALLOW_NO_PRD" = "1" ]; then
+    GATE_WARNINGS+=("PRD check skipped (--allow-no-prd)")
+    return 0
+  fi
+  local f
+  if [ -d "$REPO/docs/prd" ]; then
+    for f in "$REPO/docs/prd/"*.md; do
+      [ -e "$f" ] || continue
+      [ -s "$f" ] && return 0
+    done
+  fi
+  GATE_FAILURES+=("no PRD found in docs/prd/ (run /to-prd, or pass --allow-no-prd to override)")
+  return 1
+}
+
+# Pre-flight gate: working tree must be clean (no uncommitted changes).
+# Distinguishes "dirty" (git diff exit 1) from "not a git repo" (exit 128) —
+# the latter is a skip-with-warning, not a failure. Override: --allow-dirty.
+gate_working_tree_clean() {
+  if [ "$ALLOW_DIRTY" = "1" ]; then
+    GATE_WARNINGS+=("dirty-tree check skipped (--allow-dirty)")
+    return 0
+  fi
+  # Detect non-git first (some git versions return 128, some 129 on diff in
+  # a non-repo directory; rev-parse is the canonical "am I in a repo" check).
+  if ! ( cd "$REPO" && git rev-parse --is-inside-work-tree >/dev/null 2>&1 ); then
+    GATE_WARNINGS+=("git: not a repo, dirty-tree check skipped")
+    return 0
+  fi
+  local rc1=0 rc2=0
+  ( cd "$REPO" && git diff --quiet ) || rc1=$?
+  ( cd "$REPO" && git diff --cached --quiet ) || rc2=$?
+  if [ "$rc1" -ne 0 ] || [ "$rc2" -ne 0 ]; then
+    GATE_FAILURES+=("uncommitted changes in working tree (commit/stash, or pass --allow-dirty)")
+    return 1
+  fi
+  return 0
+}
+
+# Hardcoded list of substrings that, when present in $REPO (case-insensitive),
+# trigger the dangerous-path gate. Auditable in PR diffs. Ordered longest-first
+# so the failure message names the most specific match (e.g. "production"
+# rather than "prod" for /tmp/production-cfg/).
+DANGEROUS_KEYWORDS=(
+  credentials production migrations migration terraform payment billing
+  secrets .env infra auth prod
+)
+
+# Pre-flight gate: $REPO must not contain any DANGEROUS_KEYWORDS as a
+# case-insensitive substring. Override: --i-know-this-is-dangerous.
+gate_dangerous_path() {
+  local lower_path matched=""
+  lower_path="$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')"
+  local kw
+  for kw in "${DANGEROUS_KEYWORDS[@]}"; do
+    case "$lower_path" in
+      *"$kw"*) matched="$kw"; break ;;
+    esac
+  done
+  if [ "$ALLOW_DANGEROUS" = "1" ]; then
+    if [ -n "$matched" ]; then
+      GATE_WARNINGS+=("dangerous-path check skipped (--i-know-this-is-dangerous, would have matched '$matched')")
+    else
+      GATE_WARNINGS+=("dangerous-path check skipped (--i-know-this-is-dangerous)")
+    fi
+    return 0
+  fi
+  if [ -n "$matched" ]; then
+    GATE_FAILURES+=("working directory looks dangerous (matched '$matched') — pass --i-know-this-is-dangerous to proceed")
+    return 1
+  fi
+  return 0
+}
+
+# Print the queue (id — title) for each unblocked open issue, in dependency
+# order. Used by gate_confirm. Mirrors pick_next_issue's selection logic.
+queue_summary_lines() {
+  local issue id title status blocked_by ok dep dep_file
+  for issue in "$ISSUES_DIR"/*.md; do
+    [ -e "$issue" ] || continue
+    status="$(awk '/^status:/{print $2; exit}' "$issue")"
+    [ "$status" = "open" ] || continue
+    blocked_by="$(awk -F: '/^blocked_by:/{sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$issue")"
+    blocked_by="${blocked_by//[\[\]\"\']/}"
+    blocked_by="$(echo "$blocked_by" | tr ',' ' ')"
+    ok=1
+    for dep in $blocked_by; do
+      dep="$(echo "$dep" | tr -d '[:space:]')"
+      [ -z "$dep" ] && continue
+      dep_file="$(find "$ISSUES_DIR" -name "${dep}-*.md" -print -quit 2>/dev/null)"
+      if [ -z "$dep_file" ] || [ "$(awk '/^status:/{print $2; exit}' "$dep_file")" != "done" ]; then
+        ok=0; break
+      fi
+    done
+    [ "$ok" = "1" ] || continue
+    id="$(awk '/^id:/{print $2; exit}' "$issue")"
+    title="$(awk '/^title:/{sub(/^title:[[:space:]]*/,""); print; exit}' "$issue")"
+    printf '  %s — %s\n' "$id" "$title"
+  done
+}
+
+# Pre-flight gate: print the active caps + queue, prompt for confirmation.
+# Override: --no-confirm (queue still prints to stdout for CI logs).
+gate_confirm() {
+  local count
+  count="$(count_unblocked_open)"
+
+  printf 'ralph-afk: caps active — %d iterations | %s | $%.2f\n\n' \
+    "$MAX_ITERS" \
+    "$(format_elapsed "$(awk -v h="$MAX_HOURS" 'BEGIN{printf "%d", h*3600}')")" \
+    "$(awk -v c="$MAX_COST_USD" 'BEGIN{printf "%.2f", c+0}')"
+
+  if [ "$count" -eq 0 ]; then
+    echo "Queue (0 issues): nothing to do."
+    # Returning 0 lets the loop run; pick_next_issue will immediately fail
+    # and the loop exits with reason: no more issues.
+    return 0
+  fi
+
+  printf 'Queue (%d issues, in dependency order):\n' "$count"
+  queue_summary_lines
+
+  if [ "$NO_CONFIRM" = "1" ]; then
+    echo
+    return 0
+  fi
+
+  printf '\nProceed? [y/N]: '
+  local answer="" lower
+  read -r answer || true
+  lower="$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    y|yes) return 0 ;;
+    *)
+      echo "ralph-afk: aborted at confirmation prompt." >&2
+      exit 1
+      ;;
+  esac
+}
+
+# Run all gates. Print warnings (whether passed or failed). If any gate
+# failed, print a punch list to stderr and exit non-zero.
+preflight() {
+  GATE_FAILURES=()
+  GATE_WARNINGS=()
+
+  gate_prd_exists         || true
+  gate_working_tree_clean || true
+  gate_dangerous_path     || true
+
+  # Warnings narrate but don't block — print before any failure punch list.
+  local msg
+  for msg in "${GATE_WARNINGS[@]:-}"; do
+    [ -n "$msg" ] && echo "ralph-afk: warning — $msg" >&2
+  done
+
+  if [ "${#GATE_FAILURES[@]}" -gt 0 ]; then
+    {
+      echo "ralph-afk: cannot start — fix the following:"
+      for msg in "${GATE_FAILURES[@]}"; do
+        echo "  ✗ $msg"
+      done
+      local q
+      q="$(count_unblocked_open)"
+      echo "Queue would have been: $q issues. Re-run after fixing."
+    } >&2
+    exit 1
+  fi
+
+  # All hard gates passed. Run the confirmation gate (prints caps + queue,
+  # prompts unless --no-confirm). Aborts inline if the user declines.
+  gate_confirm
+}
+
+# Format an integer of seconds as XhYYm (e.g. 3720 -> "1h02m").
+format_elapsed() {
+  local total="$1"
+  local h=$(( total / 3600 ))
+  local m=$(( (total % 3600) / 60 ))
+  printf '%dh%02dm' "$h" "$m"
+}
+
+# Count issues by status field. Empty $ISSUES_DIR returns 0.
+count_status() {
+  local target="$1"
+  local n=0 issue st
+  for issue in "$ISSUES_DIR"/*.md; do
+    [ -e "$issue" ] || continue
+    st="$(awk '/^status:/{print $2; exit}' "$issue")"
+    [ "$st" = "$target" ] && n=$((n + 1))
+  done
+  echo "$n"
+}
+
+# Append one row to the cost-history CSV. Creates the file with header on
+# first write. Row's last field (exit_reason_for_run) is left empty — only
+# the run's last row gets the reason filled in by update_csv_last_reason.
+write_csv_row() {
+  local iter="$1" model="$2" input="$3" output="$4" cw5m="$5" cw1h="$6" cread="$7" cost="$8" cumulative="$9"
+  mkdir -p "$(dirname "$CSV_PATH")"
+  if [ ! -f "$CSV_PATH" ]; then
+    echo "$CSV_HEADER" > "$CSV_PATH"
+  fi
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '%s,%d,%s,%d,%d,%d,%d,%d,%s,%s,\n' \
+    "$ts" "$iter" "$model" "$input" "$output" "$cw5m" "$cw1h" "$cread" "$cost" "$cumulative" \
+    >> "$CSV_PATH"
+  ROWS_THIS_RUN=$((ROWS_THIS_RUN + 1))
+}
+
+# Replace the trailing empty exit_reason_for_run on the LAST line of the CSV
+# with the given reason. No-op if no rows were written this run (avoids
+# clobbering a prior run's last row).
+update_csv_last_reason() {
+  local reason="$1"
+  [ "$ROWS_THIS_RUN" -gt 0 ] || return 0
+  [ -f "$CSV_PATH" ] || return 0
+  # Portable: read all but the last line, append modified last line.
+  local tmp
+  tmp="$(mktemp)"
+  awk -v r="$reason" '
+    NR>1 { print prev }
+    { prev = $0 }
+    END {
+      sub(/,[^,]*$/, "," r, prev)
+      print prev
+    }
+  ' "$CSV_PATH" > "$tmp" && mv "$tmp" "$CSV_PATH"
+}
+
+# Print the final summary banner. Reads $EXIT_REASON, $ITERS_DONE, $MAX_ITERS,
+# $START_TS, $MAX_HOURS, $MAX_COST_USD, $CUMULATIVE_COST, $LOG_DIR. Safe to
+# call from a SIGINT trap.
+print_summary() {
+  local reason="${1:-${EXIT_REASON:-unknown}}"
+  local now="$(date +%s)"
+  local elapsed=$(( now - START_TS ))
+  local cap_total
+  cap_total="$(awk -v h="$MAX_HOURS" 'BEGIN{printf "%d", h*3600}')"
+  local done_n stuck_n
+  done_n="$(count_status done 2>/dev/null || echo 0)"
+  stuck_n="$(count_status stuck 2>/dev/null || echo 0)"
+  echo
+  echo "ralph-afk: stopped — reason: $reason"
+  printf "  iterations:    %d / %d\n"  "$ITERS_DONE" "$MAX_ITERS"
+  printf "  elapsed:       %s / %s\n"  "$(format_elapsed "$elapsed")" "$(format_elapsed "$cap_total")"
+  printf "  spend:         \$%s / \$%s\n" \
+    "$(awk -v c="$CUMULATIVE_COST" 'BEGIN{printf "%.4f", c+0}')" \
+    "$(awk -v c="$MAX_COST_USD"    'BEGIN{printf "%.2f", c+0}')"
+  printf "  issues done:   %d\n"        "$done_n"
+  printf "  issues stuck:  %d\n"        "$stuck_n"
+  printf "  logs:          %s\n"        ".claude/valk/afk-logs/"
+  printf "  cost history:  %s\n"        ".claude/valk/afk-cost-history.csv"
+}
+
+
+# Print the path of the next unblocked open issue, or empty if none.
+pick_next_issue() {
+  local issue
+  for issue in "$ISSUES_DIR"/*.md; do
+    [ -e "$issue" ] || continue
+    local status blocked_by
+    status="$(awk '/^status:/{print $2; exit}' "$issue")"
+    [ "$status" = "open" ] || continue
+
+    blocked_by="$(awk -F: '/^blocked_by:/{sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$issue")"
+    blocked_by="${blocked_by//[\[\]\"\']/}"
+    blocked_by="$(echo "$blocked_by" | tr ',' ' ')"
+
+    local ok=1 dep
+    for dep in $blocked_by; do
+      dep="$(echo "$dep" | tr -d '[:space:]')"
+      [ -z "$dep" ] && continue
+      local dep_file
+      dep_file="$(find "$ISSUES_DIR" -name "${dep}-*.md" -print -quit 2>/dev/null)"
+      if [ -z "$dep_file" ] || [ "$(awk '/^status:/{print $2; exit}' "$dep_file")" != "done" ]; then
+        ok=0; break
+      fi
+    done
+
+    if [ "$ok" = "1" ]; then
+      echo "$issue"; return 0
+    fi
+  done
+  return 0
+}
+
+# Default per-iteration prompt — can be overridden with --prompt-file.
+default_prompt() {
+  local issue_path="$1"
+  local issue_id
+  issue_id="$(basename "$issue_path" .md | cut -d- -f1)"
+  cat <<EOF
+You are running inside ralph-afk — an autonomous loop. This is an AFK iteration.
+
+The next unblocked issue is at: $issue_path (id $issue_id)
+
+Workflow:
+1. Run the /valk skill to enter the workflow.
+2. The stage is already AFK / TDD — go straight to the tdd skill.
+3. Read the issue file, including its acceptance criteria.
+4. Implement the slice red-green-refactor, one test at a time.
+5. When all acceptance criteria are checked, update the issue's frontmatter
+   to status: done, then commit with message referencing the issue id.
+6. Exit cleanly. Do not start the next issue — the loop will pick it up
+   on the next iteration with a fresh context.
+
+Constraints:
+- Use vertical slices (tracer bullets), not horizontal slicing
+- Tests must verify behavior through public interfaces, not implementation
+- No speculative features beyond what the acceptance criteria demand
+- If you get stuck or need a human decision, write a comment in the issue
+  and exit without marking it done — the loop will skip it next time.
+EOF
+}
+
+# Run the chosen CLI with the prompt, streaming output to terminal AND log.
+run_cli() {
+  local prompt="$1"
+  local logfile="$2"
+
+  case "$CLI" in
+    claude)
+      # --print runs non-interactively; --dangerously-skip-permissions is
+      # what AFK mode requires (no human to approve tool calls). Same flag
+      # Matt Pocock uses in his streaming wrapper.
+      echo "$prompt" | claude \
+        --print \
+        --dangerously-skip-permissions \
+        --output-format stream-json \
+        --verbose \
+        2>&1 | tee "$logfile"
+      ;;
+    codex)
+      # codex equivalent — non-interactive, auto-approve tool use.
+      codex exec \
+        --skip-git-repo-check \
+        --full-auto \
+        "$prompt" \
+        2>&1 | tee "$logfile"
+      ;;
+  esac
+}
+
+# --- main loop --------------------------------------------------------------
+
+# Pre-flight gates run before the startup banner; failures exit non-zero
+# with a punch list and never enter the main loop.
+preflight
+
+on_interrupt() {
+  echo
+  python3 "$STAGE_PY" clear >/dev/null 2>&1 || true
+  update_csv_last_reason "interrupted"
+  print_summary "interrupted"
+  exit 130
+}
+trap on_interrupt INT TERM
+
+echo "ralph-afk: starting in $REPO using $CLI"
+
+iter=0
+while [ "$iter" -lt "$MAX_ITERS" ]; do
+  # Time-cap check at iteration boundary (before starting the next iter).
+  if [ "$(date +%s)" -ge "$DEADLINE_TS" ]; then
+    EXIT_REASON="time cap hit"
+    break
+  fi
+
+  iter=$((iter + 1))
+
+  next_issue="$(pick_next_issue || true)"
+  if [ -z "$next_issue" ]; then
+    iter=$((iter - 1))   # this attempt didn't actually run anything
+    EXIT_REASON="no more issues"
+    break
+  fi
+
+  echo
+  echo "==== iteration $iter / $MAX_ITERS — $(basename "$next_issue") ===="
+
+  python3 "$STAGE_PY" set afk >/dev/null 2>&1 || true
+
+  if [ -n "$PROMPT_FILE" ]; then
+    prompt="$(cat "$PROMPT_FILE")"$'\n\nNext issue: '"$next_issue"
+  else
+    prompt="$(default_prompt "$next_issue")"
+  fi
+
+  ts="$(date +%Y%m%d-%H%M%S)"
+  logfile="$LOG_DIR/iter-${iter}-${ts}.log"
+
+  ITER_RC=0
+  run_cli "$prompt" "$logfile" || ITER_RC=$?
+  if [ "$ITER_RC" -ne 0 ]; then
+    echo "ralph-afk: $CLI exited $ITER_RC (see $logfile)." >&2
+  fi
+
+  # Cost analysis: parse the iter log, decide what to charge.
+  COST_OUT="$(python3 "$COST_HELPER" parse-log "$logfile" 2>&1)"
+  COST_RC=$?
+  if [ "$COST_RC" -ne 0 ]; then
+    echo "$COST_OUT" >&2
+    EXIT_REASON="cost tracking failed"
+    EXIT_CODE=1
+    break
+  fi
+  # cost-helper emits space-separated key=value pairs. Pull each out.
+  ITER_MODEL=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^model=/){sub(/^model=/,"",$i); print $i; exit}}')
+  ITER_INPUT=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^input=/){sub(/^input=/,"",$i); print $i; exit}}')
+  ITER_OUTPUT=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^output=/){sub(/^output=/,"",$i); print $i; exit}}')
+  ITER_CW5M=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cw5m=/){sub(/^cw5m=/,"",$i); print $i; exit}}')
+  ITER_CW1H=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cw1h=/){sub(/^cw1h=/,"",$i); print $i; exit}}')
+  ITER_CREAD=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cread=/){sub(/^cread=/,"",$i); print $i; exit}}')
+  SAW_USAGE=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^saw_usage=/){sub(/^saw_usage=/,"",$i); print $i; exit}}')
+  ITER_COST=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cost_usd=/){sub(/^cost_usd=/,"",$i); print $i; exit}}')
+
+  if [ "$SAW_USAGE" = "0" ]; then
+    if [ "$ITER_RC" -ne 0 ]; then
+      echo "ralph-afk: iter $iter produced no usage events and CLI exited $ITER_RC. cost tracking failed (log: $logfile)" >&2
+      EXIT_REASON="cost tracking failed"
+      EXIT_CODE=1
+      break
+    fi
+    ITER_COST="0"
+  fi
+  CUMULATIVE_COST="$(awk -v a="$CUMULATIVE_COST" -v b="${ITER_COST:-0}" 'BEGIN{printf "%.6f", a+b}')"
+
+  # Persist this iter to the cost-history CSV. Reason field stays empty;
+  # update_csv_last_reason fills it on the very last row at run end.
+  write_csv_row "$iter" "$ITER_MODEL" \
+    "${ITER_INPUT:-0}" "${ITER_OUTPUT:-0}" "${ITER_CW5M:-0}" "${ITER_CW1H:-0}" "${ITER_CREAD:-0}" \
+    "${ITER_COST:-0}" "$CUMULATIVE_COST"
+
+  # Sanity check: if the issue is still open after the iteration, the agent
+  # didn't finish it. Don't loop forever on the same one.
+  status_after="$(awk '/^status:/{print $2; exit}' "$next_issue")"
+  if [ "$status_after" != "done" ]; then
+    echo "ralph-afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
+    echo "ralph-afk: marking it 'stuck' so the loop moves on." >&2
+    awk '
+      BEGIN{in_fm=0; done=0}
+      /^---$/{in_fm = !in_fm; print; next}
+      in_fm && !done && /^status:/{print "status: stuck"; done=1; next}
+      {print}
+    ' "$next_issue" > "$next_issue.tmp" && mv "$next_issue.tmp" "$next_issue"
+  fi
+
+  ITERS_DONE=$((ITERS_DONE + 1))
+
+  # Per-iteration cumulative status line.
+  ELAPSED=$(( $(date +%s) - START_TS ))
+  CAP_SECONDS="$(awk -v h="$MAX_HOURS" 'BEGIN{printf "%d", h*3600}')"
+  PCT="$(awk -v c="$CUMULATIVE_COST" -v cap="$MAX_COST_USD" 'BEGIN{printf "%d", (cap+0>0 ? c/cap*100 : 0)}')"
+  printf "iter %d/%d done | elapsed %s / %s | spend \$%.4f / \$%.2f (~%d%%)\n" \
+    "$iter" "$MAX_ITERS" \
+    "$(format_elapsed "$ELAPSED")" "$(format_elapsed "$CAP_SECONDS")" \
+    "$CUMULATIVE_COST" "$MAX_COST_USD" "$PCT"
+
+  # Cost-cap check at iteration boundary.
+  if awk -v c="$CUMULATIVE_COST" -v cap="$MAX_COST_USD" 'BEGIN{exit !(c+0 >= cap+0)}' </dev/null; then
+    EXIT_REASON="cost cap hit"
+    break
+  fi
+done
+
+# If we exited the loop without setting a reason, the iteration cap is what
+# stopped us.
+[ -z "$EXIT_REASON" ] && EXIT_REASON="iteration cap hit"
+
+python3 "$STAGE_PY" clear >/dev/null 2>&1 || true
+update_csv_last_reason "$EXIT_REASON"
+print_summary "$EXIT_REASON"
+exit "$EXIT_CODE"

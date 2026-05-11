@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#
+# Test stub for the `claude` CLI.
+#
+# Behavior:
+#   - Reads the prompt from stdin (ralph-afk pipes it in).
+#   - If the prompt contains an `issues/<id>-*.md` path, marks that issue
+#     `status: done` (simulates a perfect agent finishing the slice).
+#     Skip with STUB_NO_MARK=1.
+#   - Emits stream-json on stdout. Default is a minimal one-message JSONL
+#     with a `usage` event using known counts (model=claude-opus-4-7).
+#     Override with STUB_FIXTURE=<file> to emit that file's contents instead.
+#   - Exits with $STUB_EXIT_CODE (default 0).
+#   - Sleeps $STUB_SLEEP_SEC seconds before emitting/exit (default 0).
+#     Lets tests simulate slow iterations for time-cap testing.
+#
+# Ignores all CLI flags — ralph-afk passes --print, --dangerously-skip-permissions,
+# --output-format stream-json, --verbose. None matter to the stub.
+
+set -u
+
+# Drain stdin so ralph-afk's `echo "$prompt" | claude ...` doesn't deadlock.
+PROMPT="$(cat)"
+
+# Pluck the issue path out of the prompt, if any.
+ISSUE_PATH=""
+if [[ -z "${STUB_NO_MARK:-}" ]]; then
+  # ralph-afk's default prompt says: "The next unblocked issue is at: <abs path> (id ...)"
+  ISSUE_PATH="$(printf '%s' "$PROMPT" | grep -oE '/[^[:space:]]*/issues/[^[:space:]]+\.md' | head -n 1)"
+  if [[ -z "$ISSUE_PATH" ]]; then
+    # Fallback: any 'issues/...md' reference, resolved against PWD.
+    rel="$(printf '%s' "$PROMPT" | grep -oE 'issues/[^[:space:]]+\.md' | head -n 1)"
+    [[ -n "$rel" ]] && ISSUE_PATH="$PWD/$rel"
+  fi
+
+  if [[ -n "$ISSUE_PATH" && -f "$ISSUE_PATH" ]]; then
+    awk '
+      BEGIN{in_fm=0; replaced=0}
+      /^---$/{in_fm = !in_fm; print; next}
+      in_fm && !replaced && /^status:/{print "status: done"; replaced=1; next}
+      {print}
+    ' "$ISSUE_PATH" > "$ISSUE_PATH.tmp" && mv "$ISSUE_PATH.tmp" "$ISSUE_PATH"
+  fi
+fi
+
+# Emit stream-json output.
+if [[ -n "${STUB_FIXTURE:-}" && -f "${STUB_FIXTURE}" ]]; then
+  cat "${STUB_FIXTURE}"
+else
+  cat <<'JSON'
+{"type":"system","subtype":"init","session_id":"stub","model":"claude-opus-4-7","cwd":"/tmp"}
+{"type":"assistant","message":{"id":"msg_stub","type":"message","role":"assistant","model":"claude-opus-4-7","content":[{"type":"text","text":"stub iteration complete"}],"stop_reason":"end_turn","usage":{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"type":"result","subtype":"success","is_error":false,"session_id":"stub","total_cost_usd":0.0}
+JSON
+fi
+
+[[ -n "${STUB_SLEEP_SEC:-}" && "${STUB_SLEEP_SEC}" != "0" ]] && sleep "${STUB_SLEEP_SEC}"
+exit "${STUB_EXIT_CODE:-0}"
