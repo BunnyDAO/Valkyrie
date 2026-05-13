@@ -71,11 +71,18 @@ You'll get a one-line warning explaining what was skipped.
 Once `to-issues` has saved a list to `issues/`, run the loop:
 
 ```bash
-ralph-afk 10                  # 10 iterations using claude (default)
-ralph-afk 10 --cli codex      # same but using codex
+ralph-afk 10                                       # 10 iters; defaults: 4h cap, $50 cap, claude CLI
+ralph-afk 10 --cli codex                           # same, but use codex
+ralph-afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budget
 ```
 
-The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`.
+**Inputs:**
+- **N** (positional, required) — max iterations to run.
+- **`--max-hours <H>`** — wall-clock cap. Default `4`. Loop exits at the next iteration boundary once hit.
+- **`--max-cost-usd <USD>`** — estimated-spend cap. Default `50`. Computed from token usage × per-million rates in `~/.claude/valkyrie/rates.json`.
+- **`--cli claude|codex`** — which CLI to drive. Default `claude`.
+
+The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration cost row is appended to `.claude/valk/afk-cost-history.csv`.
 
 ### Escape hatches
 
