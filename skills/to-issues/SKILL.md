@@ -74,9 +74,11 @@ Use the template below. Number in dependency order — blockers first — so `af
 id: 0001
 title: <short descriptive name>
 type: AFK            # or HITL
-status: open         # open | in_progress | done
+status: open         # open | in_progress | done | stuck
 blocked_by: []       # list of issue ids, e.g. [0001, 0002]
 parent: docs/prd/<slug>.md   # path to the PRD (optional)
+work_item_id:        # numeric tracker ID (Azure Boards / Jira / etc.) — required if .claude/valk-config.md sets pr_skill
+pr_url:              # filled in by the PR skill after the slice is merged-ready (leave blank when authoring)
 ---
 
 ## What to build
@@ -96,6 +98,8 @@ inlined for precision.
 
 - 0001 (or "None — can start immediately")
 ```
+
+**Frontmatter note:** `work_item_id` and `pr_url` are only meaningful when the repo has opted into a PR workflow via `<repo>/.claude/valk-config.md` (`pr_skill: to-azure-pr` or similar). For repos without that config, omit both fields and the rest of the workflow proceeds with the existing local-only behavior.
 
 ## After saving
 

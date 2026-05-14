@@ -92,6 +92,27 @@ afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budge
 
 The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration cost row is appended to `.claude/valk/afk-cost-history.csv`.
 
+### Per-project config (opt-in PR workflow)
+
+Repos can opt into a "the deliverable is a PR" workflow by adding `<repo>/.claude/valk-config.md`. With this file, `/tdd` and `afk` change what "done" means: instead of flipping a frontmatter field, the slice is only marked done after a pull request is opened and its CI build passes green.
+
+Minimal opt-in (Azure DevOps + TrueTest):
+
+```markdown
+---
+pr_skill: to-azure-pr      # name of a PR-opening skill installed in the env
+test_skill: run-truetest   # name of a test-runner skill (the GREEN signal in /tdd)
+azure_devops:
+  repository: <repo-name>
+---
+```
+
+When `pr_skill` is set, `afk`'s done-check derives state from the agent-written `pr_url:` field in the issue file — not the `status:` field. An agent that flips `status: done` without opening a PR is forced to `stuck`. The CSV cost-history gains a `pr_url` column so you can compute cost-per-PR-opened instead of cost-per-iteration.
+
+**This is opt-in.** Repos without `.claude/valk-config.md` see no change in behavior — `/tdd` marks issues done locally and `afk` reads the frontmatter, exactly as before.
+
+Full format spec: [`docs/valk-config-format.md`](docs/valk-config-format.md).
+
 ### Escape hatches
 
 - `/zoom-out` — when you're lost in unfamiliar code

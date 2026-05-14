@@ -90,6 +90,18 @@ Rules:
 - Don't anticipate future tests
 - Keep tests focused on observable behavior
 
+**GREEN signal source (config-gated):**
+
+If `<repo>/.claude/valk-config.md` declares `test_skill: <name>`, the GREEN signal must come from invoking that skill — not from running whatever test command you infer from context. Read the config:
+
+```bash
+~/Wenrwa\ Projects/Valkyrie/scripts/read-valk-config.sh test_skill
+```
+
+If the output is non-empty, invoke that skill and treat GREEN as "the skill returned success." If the output is empty, fall back to running tests the way you'd normally infer (current behavior).
+
+This forces the project's canonical test stack to be the green signal — not vibes-level local unit tests.
+
 ### 5. Refactor
 
 Only after tests are green. Look for:
@@ -113,8 +125,20 @@ Only after tests are green. Look for:
 ## On completion
 
 When all acceptance criteria are checked off:
-1. Update the issue frontmatter `status: done`
-2. Commit with a message referencing the issue id (e.g. `feat: add billing dashboard (#0003)`)
-3. Tell the user: "Issue 000N done. Next unblocked: 000M. Continue?"
 
-If invoked by `afk`, just exit cleanly — the loop will pick the next issue on its next iteration with a fresh context.
+1. Commit with a message referencing the issue id (e.g. `feat: add billing dashboard (#0003)`)
+2. **Read the repo's `.claude/valk-config.md`** to decide what "done" means:
+
+   ```bash
+   PR_SKILL=$(~/Wenrwa\ Projects/Valkyrie/scripts/read-valk-config.sh pr_skill)
+   ```
+
+   - **`PR_SKILL` is empty or `none`** → current behavior. Update issue frontmatter `status: done`. Tell the user "Issue 000N done."
+   - **`PR_SKILL` is set** (e.g. `to-azure-pr`) → invoke that skill via the Skill tool. The skill pushes the branch, opens the PR, waits for CI, and returns a JSON result. Then:
+     - `ready_for_review: true` → write the `pr_url` into the issue frontmatter alongside `status: done`. Tell the user: "Issue 000N done. PR: <url>"
+     - `ready_for_review: false` → leave issue `status: open` and write `stuck_reason: <ci_status>` into the frontmatter. Tell the user what blocked the green signal.
+   - **`PR_SKILL` is set but the named skill is not installed** → STOP. Tell the user: "Config requires /<name> but it's not available. Install it or set pr_skill: none in .claude/valk-config.md."
+
+3. If invoked by `afk`, exit cleanly — the loop reads the result on its next iteration with a fresh context.
+
+**Why this matters**: "done" without a PR is a frontmatter flip; "done" with a PR is a reviewable artifact. The config gate ensures repos that haven't opted in see no change in behavior.

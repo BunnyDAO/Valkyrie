@@ -109,6 +109,16 @@ LOG_DIR="$REPO/.claude/valk/afk-logs"
 CSV_PATH="$REPO/.claude/valk/afk-cost-history.csv"
 mkdir -p "$LOG_DIR"
 
+# Per-project config — empty PR_SKILL = pre-config behavior (current default).
+# When set, "done" is derived from PR + CI state, not the issue frontmatter
+# field. See docs/valk-config-format.md.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+READ_CONFIG="$SCRIPT_DIR/read-valk-config.sh"
+PR_SKILL=""
+if [ -x "$READ_CONFIG" ]; then
+  PR_SKILL="$("$READ_CONFIG" --repo "$REPO" pr_skill 2>/dev/null || true)"
+fi
+
 if [ ! -d "$ISSUES_DIR" ]; then
   echo "error: no issues/ directory in $REPO. Run /to-issues first." >&2
   exit 1
@@ -125,7 +135,7 @@ ITERS_DONE=0
 ROWS_THIS_RUN=0
 CUMULATIVE_COST="0"
 COST_HELPER="$HOME/.claude/valkyrie/cost-helper.py"
-CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,exit_reason_for_run'
+CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,pr_url,exit_reason_for_run'
 
 # --- helpers ----------------------------------------------------------------
 
@@ -362,14 +372,15 @@ count_status() {
 # the run's last row gets the reason filled in by update_csv_last_reason.
 write_csv_row() {
   local iter="$1" model="$2" input="$3" output="$4" cw5m="$5" cw1h="$6" cread="$7" cost="$8" cumulative="$9"
+  local pr_url="${10:-}"
   mkdir -p "$(dirname "$CSV_PATH")"
   if [ ! -f "$CSV_PATH" ]; then
     echo "$CSV_HEADER" > "$CSV_PATH"
   fi
   local ts
   ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '%s,%d,%s,%d,%d,%d,%d,%d,%s,%s,\n' \
-    "$ts" "$iter" "$model" "$input" "$output" "$cw5m" "$cw1h" "$cread" "$cost" "$cumulative" \
+  printf '%s,%d,%s,%d,%d,%d,%d,%d,%s,%s,%s,\n' \
+    "$ts" "$iter" "$model" "$input" "$output" "$cw5m" "$cw1h" "$cread" "$cost" "$cumulative" "$pr_url" \
     >> "$CSV_PATH"
   ROWS_THIS_RUN=$((ROWS_THIS_RUN + 1))
 }
@@ -524,6 +535,9 @@ on_interrupt() {
 trap on_interrupt INT TERM
 
 echo "afk: starting in $REPO using $CLI"
+if [ -n "$PR_SKILL" ]; then
+  echo "afk: pr_skill='$PR_SKILL' (done = PR open + CI green; see .claude/valk-config.md)"
+fi
 
 iter=0
 while [ "$iter" -lt "$MAX_ITERS" ]; do
@@ -592,16 +606,35 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   fi
   CUMULATIVE_COST="$(awk -v a="$CUMULATIVE_COST" -v b="${ITER_COST:-0}" 'BEGIN{printf "%.6f", a+b}')"
 
+  # ── Done check ───────────────────────────────────────────────────────
+  # Read what the agent wrote back to the issue file.
+  status_after="$(awk '/^status:/{print $2; exit}' "$next_issue")"
+  pr_url_after="$(awk -F: '/^pr_url:/{sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$next_issue" | tr -d '[:space:]')"
+
+  # When PR_SKILL is configured, "done" requires a pr_url. Agent flipping
+  # status without producing a PR is suspicious — force stuck.
+  if [ "$status_after" = "done" ] && [ -n "$PR_SKILL" ] && [ -z "$pr_url_after" ]; then
+    echo "afk: warning — $(basename "$next_issue") marked done but no pr_url written; pr_skill='$PR_SKILL' is configured." >&2
+    echo "afk: forcing to 'stuck' (agent skipped the PR step)." >&2
+    awk '
+      BEGIN{in_fm=0; done=0}
+      /^---$/{in_fm = !in_fm; print; next}
+      in_fm && !done && /^status:/{print "status: stuck"; done=1; next}
+      {print}
+    ' "$next_issue" > "$next_issue.tmp" && mv "$next_issue.tmp" "$next_issue"
+    status_after="stuck"
+    pr_url_after=""
+  fi
+
   # Persist this iter to the cost-history CSV. Reason field stays empty;
   # update_csv_last_reason fills it on the very last row at run end.
   write_csv_row "$iter" "$ITER_MODEL" \
     "${ITER_INPUT:-0}" "${ITER_OUTPUT:-0}" "${ITER_CW5M:-0}" "${ITER_CW1H:-0}" "${ITER_CREAD:-0}" \
-    "${ITER_COST:-0}" "$CUMULATIVE_COST"
+    "${ITER_COST:-0}" "$CUMULATIVE_COST" "$pr_url_after"
 
   # Sanity check: if the issue is still open after the iteration, the agent
   # didn't finish it. Don't loop forever on the same one.
-  status_after="$(awk '/^status:/{print $2; exit}' "$next_issue")"
-  if [ "$status_after" != "done" ]; then
+  if [ "$status_after" != "done" ] && [ "$status_after" != "stuck" ]; then
     echo "afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
     echo "afk: marking it 'stuck' so the loop moves on." >&2
     awk '
