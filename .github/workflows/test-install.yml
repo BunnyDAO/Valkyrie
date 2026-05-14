@@ -1,0 +1,265 @@
+name: Test Installation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'install.sh'
+      - 'uninstall.sh'
+      - 'statusline/**'
+      - 'scripts/**'
+      - '.github/workflows/test-install.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'install.sh'
+      - 'uninstall.sh'
+      - 'statusline/**'
+      - 'scripts/**'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test-installation:
+    name: Test on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false  # Continue testing other platforms even if one fails
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify Python installation
+        shell: bash
+        run: |
+          python3 --version || python --version
+          which python3 || which python
+
+      - name: Display environment info
+        shell: bash
+        run: |
+          echo "OS: ${{ matrix.os }}"
+          echo "Python: ${{ matrix.python-version }}"
+          echo "Shell: $SHELL"
+          uname -a
+          pwd
+
+      - name: Create mock Claude Code directory
+        shell: bash
+        run: |
+          mkdir -p ~/.claude/skills
+          mkdir -p ~/.claude/hooks
+          echo '{}' > ~/.claude/settings.json
+
+      - name: Run installation
+        shell: bash
+        run: |
+          chmod +x ./install.sh
+          ./install.sh
+
+      - name: Verify installation
+        shell: bash
+        run: |
+          echo "==> Checking installed files"
+
+          # Check skills are symlinked
+          test -L ~/.claude/skills/valk || { echo "✗ valk skill not installed"; exit 1; }
+          echo "✓ valk skill installed"
+
+          test -L ~/.claude/skills/grill-me || { echo "✗ grill-me skill not installed"; exit 1; }
+          echo "✓ grill-me skill installed"
+
+          # Check statusline scripts exist
+          test -f ~/.claude/valkyrie/statusline.py || { echo "✗ statusline.py missing"; exit 1; }
+          echo "✓ statusline.py installed"
+
+          test -f ~/.claude/valkyrie/stage.py || { echo "✗ stage.py missing"; exit 1; }
+          echo "✓ stage.py installed"
+
+          # Check hook is installed
+          test -f ~/.claude/hooks/valk-guard.sh || { echo "✗ valk-guard.sh missing"; exit 1; }
+          echo "✓ valk-guard.sh installed"
+
+          # Check hook is executable
+          test -x ~/.claude/hooks/valk-guard.sh || { echo "✗ valk-guard.sh not executable"; exit 1; }
+          echo "✓ valk-guard.sh is executable"
+
+          # Verify settings.json is valid JSON
+          python3 -c "import json; json.load(open('$HOME/.claude/settings.json'))" || { echo "✗ settings.json invalid"; exit 1; }
+          echo "✓ settings.json is valid JSON"
+
+          # Check settings.json contains statusLine config
+          grep -q "statusLine" ~/.claude/settings.json || { echo "✗ statusLine not configured"; exit 1; }
+          echo "✓ statusLine configured"
+
+          # Check settings.json contains hook config
+          grep -q "valk-guard" ~/.claude/settings.json || { echo "✗ hook not configured"; exit 1; }
+          echo "✓ hook configured"
+
+          echo
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✓ All installation tests passed!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Test uninstallation
+        shell: bash
+        run: |
+          chmod +x ./uninstall.sh
+          ./uninstall.sh
+
+          echo "==> Checking files removed"
+
+          # Verify skills removed
+          test ! -L ~/.claude/skills/valk || { echo "✗ valk skill still present"; exit 1; }
+          echo "✓ valk skill removed"
+
+          # Verify valkyrie directory removed
+          test ! -d ~/.claude/valkyrie || { echo "✗ valkyrie directory still present"; exit 1; }
+          echo "✓ valkyrie directory removed"
+
+          # Verify hook removed
+          test ! -f ~/.claude/hooks/valk-guard.sh || { echo "✗ hook still present"; exit 1; }
+          echo "✓ hook removed"
+
+          # Verify backup still exists
+          ls ~/.claude/settings.json.pre-valkyrie-* >/dev/null 2>&1 || { echo "✗ backup not preserved"; exit 1; }
+          echo "✓ backup preserved"
+
+          echo
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✓ All uninstallation tests passed!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+      - name: Test reinstallation (idempotency)
+        shell: bash
+        run: |
+          ./install.sh
+          ./install.sh  # Run twice to test idempotency
+
+          echo "==> Verifying idempotent installation"
+
+          # All checks should still pass
+          test -L ~/.claude/skills/valk || { echo "✗ reinstall failed"; exit 1; }
+          test -f ~/.claude/valkyrie/statusline.py || { echo "✗ reinstall failed"; exit 1; }
+          test -f ~/.claude/hooks/valk-guard.sh || { echo "✗ reinstall failed"; exit 1; }
+
+          echo "✓ Idempotent installation verified"
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            ~/.claude/settings.json
+            ~/.claude/settings.json.pre-valkyrie-*
+          retention-days: 7
+
+  test-edge-cases:
+    name: Edge Cases - ${{ matrix.scenario }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario:
+          - 'missing-settings'
+          - 'invalid-json'
+          - 'existing-skills'
+          - 'no-permissions'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup edge case - ${{ matrix.scenario }}
+        shell: bash
+        run: |
+          mkdir -p ~/.claude/skills ~/.claude/hooks
+
+          case "${{ matrix.scenario }}" in
+            missing-settings)
+              # Don't create settings.json
+              rm -f ~/.claude/settings.json
+              ;;
+            invalid-json)
+              # Create invalid JSON
+              echo '{invalid json' > ~/.claude/settings.json
+              ;;
+            existing-skills)
+              # Create conflicting skill directories
+              mkdir -p ~/.claude/skills/valk
+              echo "existing content" > ~/.claude/skills/valk/test.txt
+              ;;
+            no-permissions)
+              # This test is skipped on GH Actions (needs actual permission issues)
+              echo '{}' > ~/.claude/settings.json
+              ;;
+          esac
+
+      - name: Run installation with edge case
+        shell: bash
+        continue-on-error: true  # Some scenarios should handle errors gracefully
+        run: |
+          chmod +x ./install.sh
+          ./install.sh
+
+      - name: Verify graceful handling
+        shell: bash
+        run: |
+          # Verify backup was created for invalid JSON
+          if [ "${{ matrix.scenario }}" = "invalid-json" ]; then
+            test -f ~/.claude/settings.json.bak || { echo "✗ No backup for invalid JSON"; exit 1; }
+            echo "✓ Backup created for invalid JSON"
+          fi
+
+          # Verify existing content was backed up
+          if [ "${{ matrix.scenario }}" = "existing-skills" ]; then
+            test -d ~/.claude/skills/valk.bak || test -L ~/.claude/skills/valk || { echo "✗ Existing skill not handled"; exit 1; }
+            echo "✓ Existing skill handled correctly"
+          fi
+
+          # For missing settings, verify it was created
+          if [ "${{ matrix.scenario }}" = "missing-settings" ]; then
+            test -f ~/.claude/settings.json || { echo "✗ settings.json not created"; exit 1; }
+            echo "✓ settings.json created"
+          fi
+
+  lint-scripts:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Lint install.sh
+        run: shellcheck install.sh || true  # Warning only for now
+
+      - name: Lint uninstall.sh
+        run: shellcheck uninstall.sh || true  # Warning only for now
+
+      - name: Check script permissions
+        run: |
+          test -x install.sh || { echo "✗ install.sh not executable"; exit 1; }
+          test -x uninstall.sh || { echo "✗ uninstall.sh not executable"; exit 1; }
+          echo "✓ Scripts have correct permissions"

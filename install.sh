@@ -75,8 +75,13 @@ python3 - <<PY
 import json, os, sys
 from pathlib import Path
 
-settings_path = Path("$SETTINGS")
-hook_path = f"{Path.home()}/.claude/hooks/valk-guard.sh"
+settings_path = Path(os.path.expanduser("~/.claude/settings.json"))
+if sys.platform == 'win32':
+    hook_path = str(Path(os.path.expanduser("~/.claude/hooks/valk-guard.sh"))).replace('/', '\\\\')
+    statusline_path = str(Path(os.path.expanduser("~/.claude/valkyrie/statusline.py"))).replace('/', '\\\\')
+else:
+    hook_path = os.path.expanduser("~/.claude/hooks/valk-guard.sh")
+    statusline_path = os.path.expanduser("~/.claude/valkyrie/statusline.py")
 data = {}
 if settings_path.exists() and settings_path.stat().st_size > 0:
     try:
@@ -89,7 +94,7 @@ if settings_path.exists() and settings_path.stat().st_size > 0:
 
 data["statusLine"] = {
     "type": "command",
-    "command": f"python3 {Path.home()}/.claude/valkyrie/statusline.py",
+    "command": f"python3 {statusline_path}",
     "padding": 0,
 }
 
@@ -103,9 +108,16 @@ already_wired = any(
 if not already_wired:
     ups.append({"hooks": [{"type": "command", "command": hook_path}]})
 
-settings_path.write_text(json.dumps(data, indent=2) + "\n")
-print(f"  + statusLine -> python3 ~/.claude/valkyrie/statusline.py")
-print(f"  + UserPromptSubmit hook -> {hook_path}")
+# Ensure parent directory exists (important for Windows)
+settings_path.parent.mkdir(parents=True, exist_ok=True)
+
+try:
+    settings_path.write_text(json.dumps(data, indent=2) + "\\n")
+    print(f"  + statusLine -> python3 ~/.claude/valkyrie/statusline.py")
+    print(f"  + UserPromptSubmit hook -> {hook_path}")
+except Exception as e:
+    print(f"  ✗ Failed to write settings.json: {e}", file=sys.stderr)
+    sys.exit(1)
 PY
 
 # --- 5. afk -----------------------------------------------------------
