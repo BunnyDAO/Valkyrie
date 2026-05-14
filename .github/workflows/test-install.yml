@@ -75,8 +75,8 @@ jobs:
           test -L ~/.claude/skills/valk || { echo "✗ valk skill not installed"; exit 1; }
           echo "✓ valk skill installed"
 
-          test -L ~/.claude/skills/grill-me || { echo "✗ grill-me skill not installed"; exit 1; }
-          echo "✓ grill-me skill installed"
+          test -L ~/.claude/skills/grill-with-docs || { echo "✗ grill-with-docs skill not installed"; exit 1; }
+          echo "✓ grill-with-docs skill installed"
 
           # Check statusline scripts exist
           test -f ~/.claude/valkyrie/statusline.py || { echo "✗ statusline.py missing"; exit 1; }

@@ -29,7 +29,7 @@ echo
 # --- 1. Remove skill symlinks -----------------------------------------------
 
 echo "==> Removing skill symlinks from $SKILLS_DIR"
-for skill in grill-me refactor-spaghetti tdd to-issues to-prd valk zoom-out; do
+for skill in grill-with-docs refactor-spaghetti tdd to-issues to-prd valk zoom-out; do
   if [ -L "$SKILLS_DIR/$skill" ]; then
     rm -f "$SKILLS_DIR/$skill"
     echo "  - Removed $skill"
