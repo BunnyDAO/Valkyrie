@@ -13,14 +13,14 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 ## What you get
 
 - **A stage-aware statusline** — adapted from [moonbox3/ccstatusbar](https://github.com/moonbox3/ccstatusbar). Shows context %, model, git branch, and a colored ▶ STAGE pill.
-- **An orchestrator skill — `/valk`** — refuses to write code unless you've been through DESIGN, PRD, and ISSUES first.
-- **The four core workflow skills**, adapted from [mattpocock/skills](https://github.com/mattpocock/skills):
-  - `/grill-me` — interview you relentlessly about your design
-  - `/to-prd` — synthesize the grilling into a PRD
-  - `/to-issues` — break the PRD into independently-grabbable vertical slices
-  - `/tdd` — implement each slice red-green-refactor
+- **An orchestrator skill — `/valk`** — the entry point. It hard-enforces the four core workflow skills below, routing every coding request through DESIGN → PRD → ISSUES → TDD in order. Try to skip a stage and it refuses, names the stage you're in, and runs the correct next step instead.
+- **The four core workflow skills** (enforced by `/valk` above), adapted from [mattpocock/skills](https://github.com/mattpocock/skills):
+  - `/grill-me` — interview you relentlessly about your design (DESIGN stage)
+  - `/to-prd` — synthesize the grilling into a PRD (PRD stage)
+  - `/to-issues` — break the PRD into independently-grabbable vertical slices (ISSUES stage)
+  - `/tdd` — implement each slice red-green-refactor (TDD stage)
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
-- **A `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
+- **An `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
 
 ## Install
 
