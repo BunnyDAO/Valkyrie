@@ -46,12 +46,12 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 | UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Hard enforcement — see §2. |
 | Settings glue | `~/.claude/settings.json` | Global | Wires the statusline + hook. Patched in place. |
 | Stage marker | `<repo>/.claude/valk/stage` | Per-project | Current workflow stage. Each repo tracks its own. |
-| AFK logs | `<repo>/.claude/valk/afk-logs/` | Per-project | One log file per `ralph-afk` iteration. |
+| AFK logs | `<repo>/.claude/valk/afk-logs/` | Per-project | One log file per `afk` iteration. |
 | PRDs | `<repo>/docs/prd/<slug>.md` | Per-project | Output of `/to-prd`. |
 | Issues | `<repo>/issues/0001-*.md` | Per-project | Output of `/to-issues`. Vertical slices with frontmatter. |
-| `ralph-afk` binary | `~/.local/bin/ralph-afk` → repo | Global | The autonomous loop. Run from any project directory. |
+| `afk` binary | `~/.local/bin/afk` → repo | Global | The autonomous loop. Run from any project directory. |
 
-**What's accessible from any directory:** the slash commands (`/valk`, `/grill-me`, etc.), the hook, the statusline, the `ralph-afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
+**What's accessible from any directory:** the slash commands (`/valk`, `/grill-me`, etc.), the hook, the statusline, the `afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
 
 To update everything later: `cd ~/valkyrie && git pull && ./install.sh`.
 
@@ -192,8 +192,8 @@ Stage flips to **▶ TDD**. Two paths:
 **B) AFK (you walk away).** Run the loop:
 
 ```bash
-ralph-afk 10                # 10 iterations, default claude
-ralph-afk 10 --cli codex    # 10 iterations, codex
+afk 10                # 10 iterations, default claude
+afk 10 --cli codex    # 10 iterations, codex
 ```
 
 The loop picks issues in dependency order, spawns a fresh-context agent for each, and exits when done or the iteration cap is hit. Logs in `.claude/valk/afk-logs/`.
@@ -230,7 +230,7 @@ Both are stage-aware — they update the statusline and restore the previous sta
 
 ## 7. AFK mode — the multiplier
 
-`ralph-afk` runs the workflow autonomously by spawning a fresh-context CLI session for each issue. Pattern borrowed from Geoffrey Huntley's "Ralph" loop and Matt Pocock's streaming variant. It works because:
+`afk` runs the workflow autonomously by spawning a fresh-context CLI session for each issue. Pattern borrowed from Geoffrey Huntley's "Ralph" loop and Matt Pocock's streaming variant. It works because:
 
 1. Each issue is a vertical slice, demoable on its own — independent scope.
 2. Each iteration gets a fresh context — no degradation, no leftover state.
@@ -245,7 +245,7 @@ Both are stage-aware — they update the statusline and restore the previous sta
 ### Usage
 
 ```bash
-ralph-afk <max_iterations> \
+afk <max_iterations> \
   [--cli claude|codex] \
   [--max-hours <h>] \
   [--max-cost-usd <usd>] \
@@ -256,11 +256,11 @@ ralph-afk <max_iterations> \
 Examples:
 
 ```bash
-ralph-afk 10                                       # iter cap 10, defaults: 4h, $50
-ralph-afk 10 --max-hours 2 --max-cost-usd 25       # tighter caps
-ralph-afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with explicit budget
-ralph-afk 10 --cli codex                           # codex instead of claude
-ralph-afk 5  --prompt-file pm.md                   # custom per-iteration prompt
+afk 10                                       # iter cap 10, defaults: 4h, $50
+afk 10 --max-hours 2 --max-cost-usd 25       # tighter caps
+afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with explicit budget
+afk 10 --cli codex                           # codex instead of claude
+afk 5  --prompt-file pm.md                   # custom per-iteration prompt
 ```
 
 ### Budget caps — what stops the loop
@@ -288,7 +288,7 @@ A clean exit (code 0) with no `usage` events is treated as $0 and the loop conti
 
 Before the loop starts, four gates run. Each one turns a "you should" SOP rule into a "you can't unless" gate. Each has its own override flag — pass the flag and you've explicitly named the risk you're accepting.
 
-**Headline guarantee:** *"ralph-afk refuses to start unless you have a PRD, your tree is clean, you're not in a known-dangerous directory, and you've eyeballed the issue queue."*
+**Headline guarantee:** *"afk refuses to start unless you have a PRD, your tree is clean, you're not in a known-dangerous directory, and you've eyeballed the issue queue."*
 
 | Gate | What it checks | Failure message | Override |
 |---|---|---|---|
@@ -297,7 +297,7 @@ Before the loop starts, four gates run. Each one turns a "you should" SOP rule i
 | **Path not dangerous** | `$REPO` (case-insensitive) does not contain any of the keywords listed below | `working directory looks dangerous (matched '<keyword>') — pass --i-know-this-is-dangerous to proceed` | `--i-know-this-is-dangerous` |
 | **Confirmed by you** | Stdin reads `y/Y/yes/YES` after the queue summary prints | `aborted at confirmation prompt.` (on stderr) | `--no-confirm` |
 
-The dangerous-path keyword list is hardcoded in `scripts/ralph-afk` (auditable in PR diffs):
+The dangerous-path keyword list is hardcoded in `scripts/afk` (auditable in PR diffs):
 
 ```
 credentials  production  migrations  migration  terraform  payment  billing
@@ -311,7 +311,7 @@ Ordered longest-first so the failure message names the most specific match (`pro
 **Multi-gate failures collect into a punch list** — each failed gate adds one line; the loop exits after reporting all of them so you can fix everything in one pass:
 
 ```
-ralph-afk: cannot start — fix the following:
+afk: cannot start — fix the following:
   ✗ no PRD found in docs/prd/ (run /to-prd, or pass --allow-no-prd to override)
   ✗ uncommitted changes in working tree (commit/stash, or pass --allow-dirty)
   ✗ working directory looks dangerous (matched 'auth') — pass --i-know-this-is-dangerous to proceed
@@ -323,7 +323,7 @@ The "Queue would have been" hint lets you verify the queue is what you expected 
 **Overrides stack:** to run truly unattended in a sensitive context (e.g. CI in a `prod-` repo), you must pass each waiver flag explicitly:
 
 ```bash
-ralph-afk 10 --no-confirm --allow-dirty --i-know-this-is-dangerous --allow-no-prd
+afk 10 --no-confirm --allow-dirty --i-know-this-is-dangerous --allow-no-prd
 ```
 
 This verbosity is intentional — the friction is the product. If you find yourself stacking all four every run, ask whether the gates are wrong or your workflow is.
@@ -339,7 +339,7 @@ iter 3/10 done | elapsed 1h12m / 4h00m | spend $4.50 / $50.00 (~9%)
 When the loop exits — for any reason, including Ctrl-C — a structured summary banner prints:
 
 ```
-ralph-afk: stopped — reason: cost cap hit
+afk: stopped — reason: cost cap hit
   iterations:    7 / 10
   elapsed:       2h41m / 4h00m
   spend:         $50.04 / $50.00
@@ -383,12 +383,12 @@ When the loop ends (any reason), the stage is cleared back to idle.
 ### Recommended cadence
 
 - **Day 1 (HITL):** human-in-the-loop through DESIGN → PRD → ISSUES. The AI cannot do this part — it doesn't know what you actually want.
-- **Day 1 evening:** kick off `ralph-afk N` where N ≥ the number of issues you expect to land overnight. Walk away.
+- **Day 1 evening:** kick off `afk N` where N ≥ the number of issues you expect to land overnight. Walk away.
 - **Day 2 morning:** read the per-iteration logs, review the diff, reject anything off-spec. Remaining open or stuck issues are HITL — pair with the AI through them.
 
 ### Hard rules
 
-- **Don't run `ralph-afk` against issues you haven't backed with a PRD you read.** That's how you ship surprises.
+- **Don't run `afk` against issues you haven't backed with a PRD you read.** That's how you ship surprises.
 - **Don't run it on shared infrastructure code unattended.** The loop uses `--dangerously-skip-permissions` (claude) / `--full-auto` (codex), so the agent runs any tool without asking. Use it on contained features — not auth, payments, migrations, or production config.
 - **Don't use `--prompt-file` to bypass TDD.** The default prompt enforces red-green-refactor. If you override it, you're explicitly opting out of the safety net.
 - **Don't loop overnight in a repo with uncommitted changes you care about.** Commit or stash first; the agent may modify them.
@@ -404,9 +404,9 @@ When the loop ends (any reason), the stage is cleared back to idle.
 | Stage marker stuck on `afk` after Ctrl-C | Trap didn't fire (process killed -9) | `python3 ~/.claude/valkyrie/stage.py clear`. |
 | Run aborts with `cost tracking failed` | CLI crashed without emitting `usage` events, or unknown model | Open the named log file. If it's a real crash, fix the underlying issue and re-run. If it's a new model, add it to `scripts/rates.json` and re-run `./install.sh`. |
 | Cost numbers feel wrong | Placeholder rates still in place (issue 0006 unmerged), or rates outdated | Update `scripts/rates.json` against the official pricing pages, commit, `./install.sh`. |
-| `ralph-afk: cannot start — fix the following:` | Pre-flight gate(s) failed | Read the punch list. Each line names the gate and its override flag. Either fix the underlying issue or pass the named override. |
+| `afk: cannot start — fix the following:` | Pre-flight gate(s) failed | Read the punch list. Each line names the gate and its override flag. Either fix the underlying issue or pass the named override. |
 | You keep having to pass `--allow-dirty` | Working tree always dirty when you launch | Commit your work. The gate exists because the agent will modify uncommitted changes. If you legitimately need to keep changes, stash first. |
-| You keep having to pass `--i-know-this-is-dangerous` | Repo path matches a hardcoded keyword (e.g. `payment-svc`) | Verify the match makes sense (it's a real production-adjacent repo) and pass the flag deliberately. If it's a false positive on a safe repo, edit `DANGEROUS_KEYWORDS` in `scripts/ralph-afk` and re-install. |
+| You keep having to pass `--i-know-this-is-dangerous` | Repo path matches a hardcoded keyword (e.g. `payment-svc`) | Verify the match makes sense (it's a real production-adjacent repo) and pass the flag deliberately. If it's a false positive on a safe repo, edit `DANGEROUS_KEYWORDS` in `scripts/afk` and re-install. |
 | Confirmation prompt aborts immediately when piping | Stdin is empty / non-TTY | Pass `--no-confirm` for non-interactive runs. The queue summary still prints to stdout for CI logs. |
 
 ### Resuming after stuck issues
@@ -417,7 +417,7 @@ grep -l 'status: stuck' issues/*.md
 
 # 2. For each: review the iter log, fix the issue file, set status back to open
 # 3. Re-run the loop
-ralph-afk 5
+afk 5
 ```
 
 ---
@@ -430,7 +430,7 @@ ralph-afk 5
 | PRD is bland, doesn't reflect your decisions | The grilling session was too short | Re-run `/grill-me` with deeper questions. Aim for 15+ exchanges. |
 | AI writes 5 tests before any implementation | Horizontal slicing — anti-pattern | Stop. Tell it: "one test, one impl. Tracer bullet." |
 | Tests break every time you refactor internals | Tests are coupled to implementation | Read `/tdd` SKILL.md. Tests should use public interfaces only. |
-| `ralph-afk` keeps marking issues "stuck" | Acceptance criteria too vague, or HITL slice was mismarked AFK | Re-read the issue. Either tighten criteria or change `type: HITL`. |
+| `afk` keeps marking issues "stuck" | Acceptance criteria too vague, or HITL slice was mismarked AFK | Re-read the issue. Either tighten criteria or change `type: HITL`. |
 | Hook fires on prompts that aren't real builds | Trigger regex too aggressive | Edit `~/.claude/hooks/valk-guard.sh`, tighten `TRIGGER_RE`. |
 | Hook never fires when it should | Stage stuck non-idle, or settings.json malformed | `python3 ~/.claude/valkyrie/stage.py clear`; `jq . ~/.claude/settings.json`. |
 
@@ -513,7 +513,7 @@ Track three numbers in a shared dashboard:
 
 - **PRD theater** — engineers run the workflow but skim the PRD. Defeats the purpose. Code review gates on PRD-diff alignment fix this.
 - **Override sprawl** — every prompt becomes "skip valk for this trivial change." Audit overrides weekly. If one engineer overrides >50%, pair with them and find out why.
-- **AFK without review** — running `ralph-afk` overnight and merging without reading the diff. This is how you ship bugs at 5x. The SOP is explicit: review the diff.
+- **AFK without review** — running `afk` overnight and merging without reading the diff. This is how you ship bugs at 5x. The SOP is explicit: review the diff.
 - **One-person rollout** — if only the champion uses it, it's a hobby, not a SOP. Either get the team in or shelve the project.
 
 ### Success criteria for org adoption
@@ -541,7 +541,7 @@ If you hit those, scale up. If you don't, the workflow needs surgery — not the
 │     edit anything wrong                     │
 │  3. approve issues → ▶ ISSUES               │
 │     vertical slices only                    │
-│  4. ralph-afk 10  → ▶ AFK                   │
+│  4. afk 10  → ▶ AFK                   │
 │     review the diff in the morning          │
 ├─────────────────────────────────────────────┤
 │  Lost?      /zoom-out                       │

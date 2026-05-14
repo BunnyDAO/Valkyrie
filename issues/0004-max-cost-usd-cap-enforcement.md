@@ -4,7 +4,7 @@ title: --max-cost-usd cap enforcement and per-iter cost line
 type: AFK
 status: done
 blocked_by: [0002, 0003]
-parent: docs/prd/ralph-afk-budget-caps.md
+parent: docs/prd/afk-budget-caps.md
 ---
 
 ## What to build
@@ -14,7 +14,7 @@ Wire the cost-computing primitives from 0003 into the per-iteration loop and add
 - New flag `--max-cost-usd <X>` accepts a positive number (decimals allowed). Default: `50`.
 - Startup banner from 0002 is extended to include the cost cap on the same line:
   ```
-  ralph-afk: caps active — 10 iterations | 4h00m | $50.00
+  afk: caps active — 10 iterations | 4h00m | $50.00
   ```
 - After each iteration, parse the per-iter log via `parse_iter_usage` (from 0003), compute the iter's cost via `compute_iter_cost`, and add to a running `cumulative_cost`.
 - After each iteration, print one cumulative status line:
@@ -24,7 +24,7 @@ Wire the cost-computing primitives from 0003 into the per-iteration loop and add
 - Cap check at iter boundary: if `cumulative_cost >= max_cost_usd`, exit with `reason: cost cap hit`. Time cap and iteration cap from 0002 still take precedence if they hit first; whichever crosses first wins.
 - Final summary banner extends to include spend:
   ```
-  ralph-afk: stopped — reason: cost cap hit
+  afk: stopped — reason: cost cap hit
     iterations:    7 / 10
     elapsed:       2h41m / 4h00m
     spend:         $50.04 / $50.00 (overshoot: $0.04)
@@ -39,8 +39,8 @@ Wire the cost-computing primitives from 0003 into the per-iteration loop and add
 
 ## Acceptance criteria
 
-- [x] `ralph-afk 5 --max-cost-usd 0.05` against a stubbed CLI emitting ~$0.02/iter exits with `reason: cost cap hit` after 3 iterations and `cumulative >= 0.05`.
-- [x] `ralph-afk 5` (no flag) prints banner showing default `$50.00` and runs to completion (no cap hit) for cheap fixtures.
+- [x] `afk 5 --max-cost-usd 0.05` against a stubbed CLI emitting ~$0.02/iter exits with `reason: cost cap hit` after 3 iterations and `cumulative >= 0.05`.
+- [x] `afk 5` (no flag) prints banner showing default `$50.00` and runs to completion (no cap hit) for cheap fixtures.
 - [x] Per-iteration status line is printed after every iter, with cumulative time and spend formatted as documented.
 - [x] When time cap, iter cap, and cost cap could all theoretically hit, whichever crosses first wins; the `reason:` field on the summary identifies which.
 - [x] Stubbed CLI exits 0 with no `usage` events → iter treated as $0, loop continues, summary shows the iter as completed.

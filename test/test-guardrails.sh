@@ -7,7 +7,7 @@ set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO_ROOT:-$(dirname "$TEST_DIR")}"
-RALPH_AFK="$REPO/scripts/ralph-afk"
+RALPH_AFK="$REPO/scripts/afk"
 STUBS="$TEST_DIR/stubs"
 COST_FIX="$TEST_DIR/fixtures/cost"
 ISSUE_FIX="$TEST_DIR/fixtures/smoke/issues"

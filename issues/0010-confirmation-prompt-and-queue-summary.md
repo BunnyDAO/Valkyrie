@@ -4,7 +4,7 @@ title: Confirmation prompt + queue summary
 type: AFK
 status: done
 blocked_by: [0007]
-parent: docs/prd/ralph-afk-enforcement-guardrails.md
+parent: docs/prd/afk-enforcement-guardrails.md
 ---
 
 ## What to build
@@ -13,7 +13,7 @@ Add `gate_confirm` to the preflight orchestrator — the last gate to run, after
 
 - After all earlier gates pass, the gate prints to stdout:
   ```
-  ralph-afk: caps active — <N> iterations | <H>h<MM>m | $<U>.<UU>
+  afk: caps active — <N> iterations | <H>h<MM>m | $<U>.<UU>
 
   Queue (<K> issues, in dependency order):
     <id1> — <title1>
@@ -23,7 +23,7 @@ Add `gate_confirm` to the preflight orchestrator — the last gate to run, after
   Proceed? [y/N]: 
   ```
 - Where `<K>` is the count of unblocked open issues, and the queue lists the same set in the same order `pick_next_issue` would pick them.
-- Reads one line from stdin. Accepts `y`, `Y`, `yes`, `YES` (case sensitivity flexible: `Yes`, `YeS` all accepted). Anything else (including empty input) aborts with: `ralph-afk: aborted at confirmation prompt.` and exits non-zero.
+- Reads one line from stdin. Accepts `y`, `Y`, `yes`, `YES` (case sensitivity flexible: `Yes`, `YeS` all accepted). Anything else (including empty input) aborts with: `afk: aborted at confirmation prompt.` and exits non-zero.
 - New flag: `--no-confirm`. When passed:
   - The active-caps line + queue summary STILL print to stdout (so CI logs capture the queue).
   - The `Proceed? [y/N]: ` prompt is skipped entirely.
@@ -40,7 +40,7 @@ Add `gate_confirm` to the preflight orchestrator — the last gate to run, after
 - [x] When zero issues are queued (none open / all blocked), the queue summary says `Queue (0 issues): nothing to do.` and the loop exits cleanly with `reason: no more issues` (no prompt).
 - [x] Queue summary goes to stdout; the prompt itself goes to stdout; abort message goes to stderr.
 - [x] Multi-gate failure path: when an EARLIER gate failed, `gate_confirm` does NOT run (the loop already exited with the punch list).
-- [x] New tests in `test/test-guardrails.sh` cover the above (using stdin redirection like `echo y | ralph-afk ...` and `</dev/null`).
+- [x] New tests in `test/test-guardrails.sh` cover the above (using stdin redirection like `echo y | afk ...` and `</dev/null`).
 
 ## Blocked by
 

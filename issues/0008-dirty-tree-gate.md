@@ -4,7 +4,7 @@ title: Dirty-tree gate with non-git skip
 type: AFK
 status: done
 blocked_by: [0007]
-parent: docs/prd/ralph-afk-enforcement-guardrails.md
+parent: docs/prd/afk-enforcement-guardrails.md
 ---
 
 ## What to build
@@ -14,8 +14,8 @@ Add `gate_working_tree_clean` to the preflight orchestrator from 0007. End-to-en
 - The gate calls `git diff --quiet` AND `git diff --cached --quiet`. Exit codes:
   - `0` (both): tree is clean. Pass.
   - `1` (either): there are changes. Fail with message: `uncommitted changes in working tree (commit/stash, or pass --allow-dirty)`.
-  - `128` (either): not a git repo. Skip the check; print a one-line warning before the startup banner: `ralph-afk: warning — git: not a repo, dirty-tree check skipped`.
-- New flag: `--allow-dirty`. When passed, the gate skips the check entirely (no git diff invocation) and prints: `ralph-afk: warning — dirty-tree check skipped (--allow-dirty)`.
+  - `128` (either): not a git repo. Skip the check; print a one-line warning before the startup banner: `afk: warning — git: not a repo, dirty-tree check skipped`.
+- New flag: `--allow-dirty`. When passed, the gate skips the check entirely (no git diff invocation) and prints: `afk: warning — dirty-tree check skipped (--allow-dirty)`.
 - Distinguishing `1` vs `128` is done by capturing the exit code (don't conflate "dirty" with "no git").
 
 ## Acceptance criteria

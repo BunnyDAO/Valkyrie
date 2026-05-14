@@ -9,7 +9,7 @@ parent: docs/prd/fake.md
 
 ## What to build
 
-A second stub issue used by the smoke test. ralph-afk should pick this up after 0001 since it has no dependencies.
+A second stub issue used by the smoke test. afk should pick this up after 0001 since it has no dependencies.
 
 ## Acceptance criteria
 

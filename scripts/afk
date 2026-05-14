@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ralph-afk — autonomous loop over local issues/ using claude or codex CLI.
+# afk — autonomous loop over local issues/ using claude or codex CLI.
 #
 # Inspired by:
 #   - https://www.aihero.dev/getting-started-with-ralph (Matt Pocock)
@@ -17,12 +17,12 @@
 #   6. Repeats until: max iterations hit, no unblocked issues left, or Ctrl-C
 #
 # Usage:
-#   ralph-afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
+#   afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
 #
 # Examples:
-#   ralph-afk 10                       # 10 iterations using claude (default)
-#   ralph-afk 10 --cli codex           # same but using codex
-#   ralph-afk 5 --prompt-file pm.md    # override the per-iteration prompt
+#   afk 10                       # 10 iterations using claude (default)
+#   afk 10 --cli codex           # same but using codex
+#   afk 5 --prompt-file pm.md    # override the per-iteration prompt
 
 set -euo pipefail
 
@@ -78,7 +78,7 @@ if [ -n "$DEBUG_COST" ]; then
 fi
 
 if [ -z "$MAX_ITERS" ]; then
-  echo "usage: ralph-afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>]" >&2
+  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>]" >&2
   exit 2
 fi
 if ! [[ "$MAX_ITERS" =~ ^[0-9]+$ ]]; then
@@ -270,7 +270,7 @@ gate_confirm() {
   local count
   count="$(count_unblocked_open)"
 
-  printf 'ralph-afk: caps active — %d iterations | %s | $%.2f\n\n' \
+  printf 'afk: caps active — %d iterations | %s | $%.2f\n\n' \
     "$MAX_ITERS" \
     "$(format_elapsed "$(awk -v h="$MAX_HOURS" 'BEGIN{printf "%d", h*3600}')")" \
     "$(awk -v c="$MAX_COST_USD" 'BEGIN{printf "%.2f", c+0}')"
@@ -297,7 +297,7 @@ gate_confirm() {
   case "$lower" in
     y|yes) return 0 ;;
     *)
-      echo "ralph-afk: aborted at confirmation prompt." >&2
+      echo "afk: aborted at confirmation prompt." >&2
       exit 1
       ;;
   esac
@@ -316,12 +316,12 @@ preflight() {
   # Warnings narrate but don't block — print before any failure punch list.
   local msg
   for msg in "${GATE_WARNINGS[@]:-}"; do
-    [ -n "$msg" ] && echo "ralph-afk: warning — $msg" >&2
+    [ -n "$msg" ] && echo "afk: warning — $msg" >&2
   done
 
   if [ "${#GATE_FAILURES[@]}" -gt 0 ]; then
     {
-      echo "ralph-afk: cannot start — fix the following:"
+      echo "afk: cannot start — fix the following:"
       for msg in "${GATE_FAILURES[@]}"; do
         echo "  ✗ $msg"
       done
@@ -407,7 +407,7 @@ print_summary() {
   done_n="$(count_status done 2>/dev/null || echo 0)"
   stuck_n="$(count_status stuck 2>/dev/null || echo 0)"
   echo
-  echo "ralph-afk: stopped — reason: $reason"
+  echo "afk: stopped — reason: $reason"
   printf "  iterations:    %d / %d\n"  "$ITERS_DONE" "$MAX_ITERS"
   printf "  elapsed:       %s / %s\n"  "$(format_elapsed "$elapsed")" "$(format_elapsed "$cap_total")"
   printf "  spend:         \$%s / \$%s\n" \
@@ -457,7 +457,7 @@ default_prompt() {
   local issue_id
   issue_id="$(basename "$issue_path" .md | cut -d- -f1)"
   cat <<EOF
-You are running inside ralph-afk — an autonomous loop. This is an AFK iteration.
+You are running inside afk — an autonomous loop. This is an AFK iteration.
 
 The next unblocked issue is at: $issue_path (id $issue_id)
 
@@ -523,7 +523,7 @@ on_interrupt() {
 }
 trap on_interrupt INT TERM
 
-echo "ralph-afk: starting in $REPO using $CLI"
+echo "afk: starting in $REPO using $CLI"
 
 iter=0
 while [ "$iter" -lt "$MAX_ITERS" ]; do
@@ -559,7 +559,7 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   ITER_RC=0
   run_cli "$prompt" "$logfile" || ITER_RC=$?
   if [ "$ITER_RC" -ne 0 ]; then
-    echo "ralph-afk: $CLI exited $ITER_RC (see $logfile)." >&2
+    echo "afk: $CLI exited $ITER_RC (see $logfile)." >&2
   fi
 
   # Cost analysis: parse the iter log, decide what to charge.
@@ -583,7 +583,7 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
 
   if [ "$SAW_USAGE" = "0" ]; then
     if [ "$ITER_RC" -ne 0 ]; then
-      echo "ralph-afk: iter $iter produced no usage events and CLI exited $ITER_RC. cost tracking failed (log: $logfile)" >&2
+      echo "afk: iter $iter produced no usage events and CLI exited $ITER_RC. cost tracking failed (log: $logfile)" >&2
       EXIT_REASON="cost tracking failed"
       EXIT_CODE=1
       break
@@ -602,8 +602,8 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   # didn't finish it. Don't loop forever on the same one.
   status_after="$(awk '/^status:/{print $2; exit}' "$next_issue")"
   if [ "$status_after" != "done" ]; then
-    echo "ralph-afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
-    echo "ralph-afk: marking it 'stuck' so the loop moves on." >&2
+    echo "afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
+    echo "afk: marking it 'stuck' so the loop moves on." >&2
     awk '
       BEGIN{in_fm=0; done=0}
       /^---$/{in_fm = !in_fm; print; next}

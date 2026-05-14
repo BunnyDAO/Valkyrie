@@ -6,7 +6,7 @@ Loose ends and follow-ups not blocking shipping. Group by theme; check off as th
 
 ## AFK budget caps (spend control)
 
-**Status: shipped via issues 0001–0005.** `ralph-afk` now caps by iterations, hours, and dollars. CSV history accumulates per-iter data for tuning defaults later. Real published rates are blocked on issue 0006 (HITL).
+**Status: shipped via issues 0001–0005.** `afk` now caps by iterations, hours, and dollars. CSV history accumulates per-iter data for tuning defaults later. Real published rates are blocked on issue 0006 (HITL).
 
 - [x] **Wall-clock cap** — shipped as `--max-hours <N>` (decimal-friendly), default 4h. Issue 0002.
 - [x] **`--max-cost-usd X`** — shipped, default $50. Parses claude `stream-json` usage events, applies rate table per-model, sums across iters, breaks at boundary. Issue 0004.
@@ -18,13 +18,13 @@ Loose ends and follow-ups not blocking shipping. Group by theme; check off as th
 - [ ] **Real published rates** — issue 0006 (HITL). Pull current Anthropic + OpenAI prices and replace the placeholder values in `rates.json`.
 - [ ] **Per-iteration sub-cap** — bound runaway single-iter spend (the boundary-only design lets one bad iter overshoot the cumulative cap). Add if real usage shows iter cost variance is a problem.
 
-Headline guarantee live now (with placeholder rates): *"ralph-afk will spend at most $X or N hours, whichever comes first, and stop cleanly at a stage boundary."* The dollar number becomes real once 0006 lands.
+Headline guarantee live now (with placeholder rates): *"afk will spend at most $X or N hours, whichever comes first, and stop cleanly at a stage boundary."* The dollar number becomes real once 0006 lands.
 
 ---
 
 ## AFK enforcement (the unenforced gap)
 
-`ralph-afk` runs from a parent shell and spawns Claude Code subprocesses. The `UserPromptSubmit` hook can't reach it. Today its only defense is written discipline in SOP §7.
+`afk` runs from a parent shell and spawns Claude Code subprocesses. The `UserPromptSubmit` hook can't reach it. Today its only defense is written discipline in SOP §7.
 
 Cheap technical guardrails to turn the SOP rules into actual gates:
 
@@ -78,6 +78,6 @@ When all of these land, AFK has the same level of technical enforcement as the i
 
 ## Known unknowns
 
-- [ ] **What happens if two `ralph-afk` processes run in the same repo?** Race on the stage marker, race on issue status writes. Probably need a lockfile in `.claude/valk/`.
+- [ ] **What happens if two `afk` processes run in the same repo?** Race on the stage marker, race on issue status writes. Probably need a lockfile in `.claude/valk/`.
 - [ ] **What's the correct behavior when an issue's `blocked_by:` references an issue that doesn't exist?** Today it'd silently treat it as unblocked (no file found). Should probably error.
 - [ ] **Does the hook's `jq` dependency need vendoring?** macOS doesn't ship `jq` by default on every version. Document the dep, or rewrite the hook in pure bash + python.

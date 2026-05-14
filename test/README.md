@@ -1,7 +1,7 @@
-# `test/` — ralph-afk shell test harness
+# `test/` — afk shell test harness
 
-Self-contained, network-free test suite for `scripts/ralph-afk`. Tests run real
-`ralph-afk` against stubbed `claude`/`codex` binaries that emit deterministic
+Self-contained, network-free test suite for `scripts/afk`. Tests run real
+`afk` against stubbed `claude`/`codex` binaries that emit deterministic
 output. No frameworks — just bash.
 
 ## Run the suite
@@ -34,7 +34,7 @@ mkdir -p "$WORKDIR/issues"
 # ... copy fixtures, set up state ...
 
 cd "$WORKDIR"
-PATH="$STUBS:$PATH" "$REPO/scripts/ralph-afk" 2 >"$WORKDIR/run.out" 2>&1
+PATH="$STUBS:$PATH" "$REPO/scripts/afk" 2 >"$WORKDIR/run.out" 2>&1
 
 # ... assert ...
 ```
@@ -67,6 +67,6 @@ temp workdir; never run against fixtures in place.
 
 ## Why bash and not <X>
 
-`ralph-afk` is bash. Tests stay in the same language so they can stub via
+`afk` is bash. Tests stay in the same language so they can stub via
 `PATH`-shadowing and assert on file system state without ceremony. No deps
-beyond what `ralph-afk` itself needs (`bash`, `awk`, `grep`, `python3`).
+beyond what `afk` itself needs (`bash`, `awk`, `grep`, `python3`).

@@ -27,7 +27,7 @@ Issue titles and descriptions should use the project's domain vocabulary (`CONTE
 
 Each issue is a **thin vertical slice** that cuts through ALL integration layers (schema → API → UI → tests), NOT a horizontal slice of one layer.
 
-Slices may be **HITL** (human-in-the-loop, requires architectural review) or **AFK** (away-from-keyboard, can be implemented and merged autonomously by `ralph-afk`). Prefer AFK over HITL where possible — AFK is what makes the workflow scale.
+Slices may be **HITL** (human-in-the-loop, requires architectural review) or **AFK** (away-from-keyboard, can be implemented and merged autonomously by `afk`). Prefer AFK over HITL where possible — AFK is what makes the workflow scale.
 
 Rules:
 - Each slice delivers a narrow but COMPLETE path through every layer
@@ -63,7 +63,7 @@ issues/0002-<slug>.md
 ...
 ```
 
-Use the template below. Number in dependency order — blockers first — so `ralph-afk` can pick the next unblocked one trivially.
+Use the template below. Number in dependency order — blockers first — so `afk` can pick the next unblocked one trivially.
 
 **If `gh` is set up and the user opts in:** also `gh issue create` for each slice, with the `ready-for-agent` label, in dependency order so the "Blocked by" field can reference real issue numbers.
 
@@ -100,6 +100,6 @@ inlined for precision.
 ## After saving
 
 Tell the user how many issues were created and where:
-> "Created N issues in `issues/`. Ready to start TDD on the first unblocked one? Or `ralph-afk N` to chew through them all autonomously."
+> "Created N issues in `issues/`. Ready to start TDD on the first unblocked one? Or `afk N` to chew through them all autonomously."
 
 Do NOT start `tdd` yourself — let the orchestrator transition.

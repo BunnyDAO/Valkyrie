@@ -7,7 +7,7 @@ set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO_ROOT:-$(dirname "$TEST_DIR")}"
-RALPH_AFK="$REPO/scripts/ralph-afk"
+RALPH_AFK="$REPO/scripts/afk"
 STUBS="$TEST_DIR/stubs"
 COST_FIX="$TEST_DIR/fixtures/cost"
 ISSUE_FIX="$TEST_DIR/fixtures/smoke/issues"
@@ -44,9 +44,9 @@ blocked_by: []
 EOF
 }
 
-# Run ralph-afk inside $W with $H as HOME, $STUBS first on PATH, plus extra
+# Run afk inside $W with $H as HOME, $STUBS first on PATH, plus extra
 # env vars and CLI args. Auto-injects --no-confirm so confirmation prompt
-# (issue 0010) doesn't block tests. Returns ralph-afk's exit code.
+# (issue 0010) doesn't block tests. Returns afk's exit code.
 run_ra() {
   ( cd "$W" && HOME="$H" PATH="$STUBS:$PATH" "$@" --no-confirm >"$OUT" 2>&1 )
 }
@@ -98,7 +98,7 @@ make_fake_home "$H"
 STUB_FIXTURE="$COST_FIX/opus-simple.log" run_ra "$RALPH_AFK" 2 --max-cost-usd 100
 [ $? -eq 0 ] || fail "case 4: nonzero exit"
 assert_match "$OUT" "spend:"
-assert_match "$OUT" "ralph-afk: stopped"
+assert_match "$OUT" "afk: stopped"
 rm -rf "$H" "$W"
 
 # ---------------------------------------------------------------------------

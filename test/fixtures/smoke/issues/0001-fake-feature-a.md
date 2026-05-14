@@ -9,7 +9,7 @@ parent: docs/prd/fake.md
 
 ## What to build
 
-A stub issue used by the smoke test. The stub claude binary marks this `status: done` when ralph-afk hands it this file's path.
+A stub issue used by the smoke test. The stub claude binary marks this `status: done` when afk hands it this file's path.
 
 ## Acceptance criteria
 

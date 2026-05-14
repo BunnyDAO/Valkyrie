@@ -2,7 +2,7 @@
 #
 # Tests for issue 0003: rates.json + cost computation core.
 #
-# Each case sets up a fake $HOME so `ralph-afk` reads a test-controlled
+# Each case sets up a fake $HOME so `afk` reads a test-controlled
 # rates.json instead of the user's real one. That lets us test missing/
 # malformed/unknown-model paths without touching the user's filesystem.
 
@@ -10,7 +10,7 @@ set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO_ROOT:-$(dirname "$TEST_DIR")}"
-RALPH_AFK="$REPO/scripts/ralph-afk"
+RALPH_AFK="$REPO/scripts/afk"
 COST_FIX="$TEST_DIR/fixtures/cost"
 
 fail() { echo "FAIL: $*"; [ -n "${OUT:-}" ] && [ -f "$OUT" ] && { echo "--- stdout ---"; cat "$OUT"; }; exit 1; }
@@ -21,7 +21,7 @@ make_fake_home() {
   local home="$1"
   mkdir -p "$home/.claude/valkyrie"
   cp "$REPO/scripts/rates.json" "$home/.claude/valkyrie/rates.json"
-  # cost-helper.py is what ralph-afk shells out to; install.sh would copy it.
+  # cost-helper.py is what afk shells out to; install.sh would copy it.
   cp "$REPO/scripts/cost-helper.py" "$home/.claude/valkyrie/cost-helper.py"
 }
 

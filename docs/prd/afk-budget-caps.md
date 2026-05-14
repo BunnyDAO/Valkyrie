@@ -1,16 +1,16 @@
-# ralph-afk budget caps
+# afk budget caps
 
 ## Problem Statement
 
-`ralph-afk` runs autonomously, spawning fresh-context CLI sessions to work through issues while the user is away. Today its only safety knob is `<max_iterations>` — a count of how many issues to attempt. That's the wrong dimension for cost: one runaway iteration (long generation, cache misses, expensive model) can spend more than ten short ones. An overnight `ralph-afk 50` against opus could quietly burn hundreds of dollars before anyone notices.
+`afk` runs autonomously, spawning fresh-context CLI sessions to work through issues while the user is away. Today its only safety knob is `<max_iterations>` — a count of how many issues to attempt. That's the wrong dimension for cost: one runaway iteration (long generation, cache misses, expensive model) can spend more than ten short ones. An overnight `afk 50` against opus could quietly burn hundreds of dollars before anyone notices.
 
 The user has no upper bound on dollars or hours. The default position of "trust the loop" doesn't survive contact with billing.
 
 ## Solution
 
-Add two new flags to `ralph-afk` that bound the run by **wall-clock hours** and by **estimated API spend in USD**. Caps are checked at iteration boundaries (so the current iter completes cleanly, no half-finished commits). Sane defaults are on by default — running `ralph-afk N` alone is now safe; you opt *out* of safety by passing higher values, not in.
+Add two new flags to `afk` that bound the run by **wall-clock hours** and by **estimated API spend in USD**. Caps are checked at iteration boundaries (so the current iter completes cleanly, no half-finished commits). Sane defaults are on by default — running `afk N` alone is now safe; you opt *out* of safety by passing higher values, not in.
 
-Headline guarantee after this lands: *"ralph-afk will spend at most $X or N hours, whichever comes first, and stop cleanly at a stage boundary."*
+Headline guarantee after this lands: *"afk will spend at most $X or N hours, whichever comes first, and stop cleanly at a stage boundary."*
 
 ## User Stories
 
@@ -32,7 +32,7 @@ Headline guarantee after this lands: *"ralph-afk will spend at most $X or N hour
 
 ### Modules
 
-The implementation is one bash script edit (`scripts/ralph-afk`) plus one new data file. Conceptually it splits into six small, single-purpose modules — even though they live as bash functions in one file:
+The implementation is one bash script edit (`scripts/afk`) plus one new data file. Conceptually it splits into six small, single-purpose modules — even though they live as bash functions in one file:
 
 - **Rate table loader** — read `~/.claude/valkyrie/rates.json` once at startup; validate schema; load into memory. Hard refuse on missing/malformed/unknown-schema.
 - **Cap config** — parse `--max-hours`, `--max-cost-usd` from argv; merge with hardcoded defaults (4h / $50). Compute absolute deadline = `start_time + max_hours * 3600`. Print active caps banner.
@@ -90,7 +90,7 @@ Provider keys (`anthropic`, `openai`) match the `--cli` flag mapping (`claude` �
 - **CSV file:** appended each iteration, never overwritten across runs. Path: `<repo>/.claude/valk/afk-cost-history.csv`. Columns: `timestamp, iter, model, input_tokens, output_tokens, cache_write_5m, cache_write_1h, cache_read, cost_usd, cumulative_usd, exit_reason_for_run`.
 - **Final summary banner** (printed on any exit, including Ctrl-C):
   ```
-  ralph-afk: stopped — reason: cost cap hit
+  afk: stopped — reason: cost cap hit
     iterations:    7 / 10
     elapsed:       2h41m / 4h00m
     spend:         $50.04 / $50.00 (overshoot: $0.04)
@@ -116,7 +116,7 @@ Provider keys (`anthropic`, `openai`) match the `--cli` flag mapping (`claude` �
 
 External behavior is what we test — the public surface is the CLI flags and the side-effects on disk (CSV file, exit code, stdout summary). Internals (which bash function did what) are not tested.
 
-**Modules to test (via shell-out to `ralph-afk`):**
+**Modules to test (via shell-out to `afk`):**
 
 1. **Rate table loader** — given a known-good `rates.json`, the loop accepts it. Given malformed JSON, missing file, or a known-unknown model in the rate table, the loop exits non-zero with the expected error message. (Black-box: just check exit code + stderr.)
 2. **Cap config + banner** — given `--max-hours 2 --max-cost-usd 30`, startup banner reports those values. Defaults (no flags) report `4h / $50`.
@@ -129,14 +129,14 @@ External behavior is what we test — the public surface is the CLI flags and th
 
 **Test scaffold:** a small fixture directory (`test/fixtures/`) with stubbed `claude` and `codex` binaries on PATH that emit canned stream-json with known token counts. Lets the loop run end-to-end in milliseconds, deterministically.
 
-**Prior art:** none in this repo — `ralph-afk` has no existing tests. This PR adds the test harness alongside the feature.
+**Prior art:** none in this repo — `afk` has no existing tests. This PR adds the test harness alongside the feature.
 
 ## Out of Scope
 
 - Real-time cost cap enforcement *within* a single iteration. We only check at boundaries; one iter can overshoot.
 - Tracking actual billed cost (vs. estimated). The cap is based on token counts × posted rates; if Anthropic applies tier discounts or your account has volume pricing, our number diverges from the bill. We're estimating, and the headline says so.
 - Pulling rates dynamically from any URL or API. `rates.json` is checked-in static data, updated by PR.
-- Cross-run cumulative caps (e.g. "no more than $200 this week"). Each `ralph-afk` invocation has its own caps.
+- Cross-run cumulative caps (e.g. "no more than $200 this week"). Each `afk` invocation has its own caps.
 - Anything codex-specific beyond basic input/output token tracking. Codex's equivalent of cache tiers is not in the schema.
 - A `--dry-run` flag, a per-iter sub-cap, and per-machine default config — all noted in the deferred list above.
 

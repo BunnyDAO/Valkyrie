@@ -48,7 +48,7 @@ RIGHT (vertical):
 
 ### 1. Pick the next slice
 
-If `issues/` exists, read it. Pick the next issue whose `blocked_by` list is empty or all-`done`. Mark its `status` to `in_progress` in the frontmatter. If multiple are unblocked, ask the user to pick (or, when invoked from `ralph-afk`, pick the lowest id).
+If `issues/` exists, read it. Pick the next issue whose `blocked_by` list is empty or all-`done`. Mark its `status` to `in_progress` in the frontmatter. If multiple are unblocked, ask the user to pick (or, when invoked from `afk`, pick the lowest id).
 
 If no `issues/` exists, ask the user what behavior they want to build.
 
@@ -60,7 +60,7 @@ Before writing any code:
 - [ ] Identify opportunities for **deep modules** (small interface, deep implementation)
 - [ ] Design interfaces for testability
 - [ ] List the behaviors to test (not implementation steps)
-- [ ] Get user approval on the plan (skip approval when invoked from `ralph-afk` — the issue acceptance criteria *are* the plan)
+- [ ] Get user approval on the plan (skip approval when invoked from `afk` — the issue acceptance criteria *are* the plan)
 
 Ask: "What should the public interface look like? Which behaviors are most important to test?"
 
@@ -117,4 +117,4 @@ When all acceptance criteria are checked off:
 2. Commit with a message referencing the issue id (e.g. `feat: add billing dashboard (#0003)`)
 3. Tell the user: "Issue 000N done. Next unblocked: 000M. Continue?"
 
-If invoked by `ralph-afk`, just exit cleanly — the loop will pick the next issue on its next iteration with a fresh context.
+If invoked by `afk`, just exit cleanly — the loop will pick the next issue on its next iteration with a fresh context.

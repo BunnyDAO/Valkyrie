@@ -4,7 +4,7 @@ title: CSV cost history file
 type: AFK
 status: done
 blocked_by: [0004]
-parent: docs/prd/ralph-afk-budget-caps.md
+parent: docs/prd/afk-budget-caps.md
 ---
 
 ## What to build
@@ -26,14 +26,14 @@ Persist per-iteration cost data across runs to a CSV file. This gives the team r
 
 ## Acceptance criteria
 
-- [x] First-time `ralph-afk` run creates `<repo>/.claude/valk/afk-cost-history.csv` with the header line followed by one row per iteration.
+- [x] First-time `afk` run creates `<repo>/.claude/valk/afk-cost-history.csv` with the header line followed by one row per iteration.
 - [x] Subsequent runs append rows; header is not duplicated.
 - [x] Each row has exactly 11 fields, comma-separated, no trailing comma. Fields containing commas (none expected, but defensively) are quoted.
 - [x] `cumulative_usd` of row N equals `cumulative_usd` of row N-1 + `cost_usd` of row N (within rounding).
 - [x] After a Ctrl-C mid-iter, the CSV contains rows for all iterations that completed before the interrupt; the in-flight iter has no row.
 - [x] The last row of a finished run has `exit_reason_for_run` set to one of the documented reasons.
 - [x] Earlier rows from the same run have `exit_reason_for_run` empty.
-- [x] A row is durable: killing `ralph-afk` with SIGKILL between iterations does not corrupt prior rows.
+- [x] A row is durable: killing `afk` with SIGKILL between iterations does not corrupt prior rows.
 - [x] Tests in `test/` cover: header on first creation; append on second run; column count and order; cumulative arithmetic; SIGINT preserves prior rows; reason populated on last row only.
 
 ## Blocked by

@@ -7,7 +7,8 @@
 #   2. Copies statusline.py + stage.py into ~/.claude/valkyrie/
 #   3. Installs the UserPromptSubmit hook into ~/.claude/hooks/
 #   4. Patches ~/.claude/settings.json to wire the statusline + hook
-#   5. Symlinks scripts/ralph-afk into ~/.local/bin/ (creating it if needed)
+#   5. Symlinks scripts/afk into ~/.local/bin/ as both `afk` and `ralph-afk`
+#      (creating ~/.local/bin/ if needed; ralph-afk kept as a BC alias)
 #
 # Idempotent: safe to re-run after a git pull.
 
@@ -107,17 +108,19 @@ print(f"  + statusLine -> python3 ~/.claude/valkyrie/statusline.py")
 print(f"  + UserPromptSubmit hook -> {hook_path}")
 PY
 
-# --- 5. ralph-afk -----------------------------------------------------------
+# --- 5. afk -----------------------------------------------------------
 
-echo "==> linking ralph-afk into $LOCAL_BIN"
-chmod +x "$REPO/scripts/ralph-afk"
-target="$LOCAL_BIN/ralph-afk"
-if [ -e "$target" ] && [ ! -L "$target" ]; then
-  echo "  - existing non-symlink ralph-afk in $LOCAL_BIN — backing up to ${target}.bak"
-  mv "$target" "${target}.bak"
-fi
-ln -sfn "$REPO/scripts/ralph-afk" "$target"
-echo "  + ralph-afk -> $REPO/scripts/ralph-afk"
+echo "==> linking afk into $LOCAL_BIN"
+chmod +x "$REPO/scripts/afk"
+for name in afk ralph-afk; do
+  target="$LOCAL_BIN/$name"
+  if [ -e "$target" ] && [ ! -L "$target" ]; then
+    echo "  - existing non-symlink $name in $LOCAL_BIN — backing up to ${target}.bak"
+    mv "$target" "${target}.bak"
+  fi
+  ln -sfn "$REPO/scripts/afk" "$target"
+  echo "  + $name -> $REPO/scripts/afk"
+done
 
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
@@ -132,5 +135,5 @@ echo "Valkyrie installed. Restart Claude Code to pick up the new statusline."
 echo
 echo "Try it:"
 echo "  - In any project: ask Claude to 'add a feature' — /valk will gate the flow."
-echo "  - To run autonomously: ralph-afk 10                  (uses claude)"
-echo "                         ralph-afk 10 --cli codex      (uses codex)"
+echo "  - To run autonomously: afk 10                  (uses claude)"
+echo "                         afk 10 --cli codex      (uses codex)"

@@ -118,8 +118,8 @@ DESIGN → PRD → ISSUES → TDD
 - **Prerequisites:** PRD written, issues queued, working tree clean.
 - Run from your shell:
   ```
-  ralph-afk 10                                    # defaults: 4h, $50
-  ralph-afk 50 --max-hours 12 --max-cost-usd 200  # overnight
+  afk 10                                    # defaults: 4h, $50
+  afk 50 --max-hours 12 --max-cost-usd 200  # overnight
   ```
 - Spawns a fresh CLI session per issue. No context drift.
 - **Pre-flight gates refuse to launch** unless prerequisites are met.

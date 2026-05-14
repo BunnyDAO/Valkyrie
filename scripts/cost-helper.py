@@ -2,13 +2,13 @@
 """
 cost-helper.py — parse stream-json logs and compute per-iteration USD cost.
 
-Invoked from ralph-afk. Two subcommands:
+Invoked from afk. Two subcommands:
 
   parse-log <logfile>
       Print one whitespace-separated line:
         model=<name> input=<n> output=<n> cw5m=<n> cw1h=<n> cread=<n> exit=<code> cost_usd=<decimal>
       The exit code is always 0 on the printed line (the parser doesn't know
-      the CLI's exit; ralph-afk passes that separately when needed).
+      the CLI's exit; afk passes that separately when needed).
       Exits 0 if the log was parseable AND the model is in the rate table.
       Exits non-zero with a clear stderr message on any failure
       (missing rates.json, malformed rates.json, unknown model).

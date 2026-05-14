@@ -4,7 +4,7 @@ title: Fill real Anthropic and OpenAI prices in rates.json
 type: HITL
 status: open
 blocked_by: [0003]
-parent: docs/prd/ralph-afk-budget-caps.md
+parent: docs/prd/afk-budget-caps.md
 ---
 
 ## What to build
@@ -35,7 +35,7 @@ This issue is HITL because:
 - [ ] No field still contains the placeholder value from 0003.
 - [ ] A note (top of file, comment block, or sibling file) records: the URL consulted, the date of the lookup, and the human reviewer's identifier.
 - [ ] After `git pull && ./install.sh`, `~/.claude/valkyrie/rates.json` reflects the new prices.
-- [ ] A smoke test: `ralph-afk --debug-cost test/fixtures/known-opus-100k-tokens.log` produces a USD value within 1% of the expected published-rate calculation.
+- [ ] A smoke test: `afk --debug-cost test/fixtures/known-opus-100k-tokens.log` produces a USD value within 1% of the expected published-rate calculation.
 
 ## Blocked by
 

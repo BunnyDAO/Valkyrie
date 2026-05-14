@@ -3,7 +3,7 @@
 # Test stub for the `claude` CLI.
 #
 # Behavior:
-#   - Reads the prompt from stdin (ralph-afk pipes it in).
+#   - Reads the prompt from stdin (afk pipes it in).
 #   - If the prompt contains an `issues/<id>-*.md` path, marks that issue
 #     `status: done` (simulates a perfect agent finishing the slice).
 #     Skip with STUB_NO_MARK=1.
@@ -14,18 +14,18 @@
 #   - Sleeps $STUB_SLEEP_SEC seconds before emitting/exit (default 0).
 #     Lets tests simulate slow iterations for time-cap testing.
 #
-# Ignores all CLI flags — ralph-afk passes --print, --dangerously-skip-permissions,
+# Ignores all CLI flags — afk passes --print, --dangerously-skip-permissions,
 # --output-format stream-json, --verbose. None matter to the stub.
 
 set -u
 
-# Drain stdin so ralph-afk's `echo "$prompt" | claude ...` doesn't deadlock.
+# Drain stdin so afk's `echo "$prompt" | claude ...` doesn't deadlock.
 PROMPT="$(cat)"
 
 # Pluck the issue path out of the prompt, if any.
 ISSUE_PATH=""
 if [[ -z "${STUB_NO_MARK:-}" ]]; then
-  # ralph-afk's default prompt says: "The next unblocked issue is at: <abs path> (id ...)"
+  # afk's default prompt says: "The next unblocked issue is at: <abs path> (id ...)"
   ISSUE_PATH="$(printf '%s' "$PROMPT" | grep -oE '/[^[:space:]]*/issues/[^[:space:]]+\.md' | head -n 1)"
   if [[ -z "$ISSUE_PATH" ]]; then
     # Fallback: any 'issues/...md' reference, resolved against PWD.

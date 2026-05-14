@@ -2,7 +2,7 @@
 #
 # Smoke test — proves the harness wires up correctly.
 #
-# Runs the existing ralph-afk against a stubbed `claude` binary that marks
+# Runs the existing afk against a stubbed `claude` binary that marks
 # fixture issues `status: done`. Asserts the loop completes both iterations,
 # exits 0, and clears the stage marker for the temp workdir.
 
@@ -10,12 +10,12 @@ set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO_ROOT:-$(dirname "$TEST_DIR")}"
-RALPH_AFK="$REPO/scripts/ralph-afk"
+RALPH_AFK="$REPO/scripts/afk"
 STUB_DIR="$TEST_DIR/stubs"
 FIXTURE_DIR="$TEST_DIR/fixtures/smoke"
 
 # Sanity: prerequisites exist.
-[ -x "$RALPH_AFK" ]              || { echo "ralph-afk missing at $RALPH_AFK"; exit 1; }
+[ -x "$RALPH_AFK" ]              || { echo "afk missing at $RALPH_AFK"; exit 1; }
 [ -x "$STUB_DIR/claude" ]        || { echo "stub claude missing at $STUB_DIR/claude"; exit 1; }
 [ -d "$FIXTURE_DIR/issues" ]     || { echo "fixture issues missing"; exit 1; }
 
@@ -27,7 +27,7 @@ mkdir -p "$WORKDIR/issues" "$WORKDIR/docs/prd"
 cp "$FIXTURE_DIR/issues/"*.md "$WORKDIR/issues/"
 echo "stub PRD content" > "$WORKDIR/docs/prd/dummy.md"
 
-# Run ralph-afk against the stub. Stubs must shadow any real `claude` on PATH.
+# Run afk against the stub. Stubs must shadow any real `claude` on PATH.
 cd "$WORKDIR"
 PATH="$STUB_DIR:$PATH" "$RALPH_AFK" 2 --no-confirm >"$WORKDIR/run.out" 2>&1
 RC=$?
@@ -36,7 +36,7 @@ RC=$?
 assert() { [ "$2" = "$3" ] || { echo "FAIL: $1 — expected '$3', got '$2'"; cat "$WORKDIR/run.out"; exit 1; }; }
 assert_match() { grep -q "$2" "$1" || { echo "FAIL: '$2' not found in $1"; cat "$1"; exit 1; }; }
 
-# 1. ralph-afk exited cleanly.
+# 1. afk exited cleanly.
 assert "exit code" "$RC" "0"
 
 # 2. Both fixture issues got marked done.

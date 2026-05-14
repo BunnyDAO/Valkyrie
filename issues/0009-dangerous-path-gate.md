@@ -4,20 +4,20 @@ title: Dangerous-path gate
 type: AFK
 status: done
 blocked_by: [0007]
-parent: docs/prd/ralph-afk-enforcement-guardrails.md
+parent: docs/prd/afk-enforcement-guardrails.md
 ---
 
 ## What to build
 
 Add `gate_dangerous_path` to the preflight orchestrator. End-to-end:
 
-- The gate scans `$PWD` for case-insensitive substrings against this hardcoded list (in `ralph-afk`):
+- The gate scans `$PWD` for case-insensitive substrings against this hardcoded list (in `afk`):
   ```
   auth payment billing migration migrations infra terraform prod production secrets credentials .env
   ```
 - If any keyword matches, the gate fails with: `working directory looks dangerous (matched '<keyword>') — pass --i-know-this-is-dangerous to proceed`.
 - Only the FIRST matching keyword is named in the message (avoid spam if a path matches multiple).
-- New flag: `--i-know-this-is-dangerous`. When passed, the gate skips the check and prints: `ralph-afk: warning — dangerous-path check skipped (--i-know-this-is-dangerous, would have matched '<keyword>')`. The would-have-matched info is helpful even when overridden.
+- New flag: `--i-know-this-is-dangerous`. When passed, the gate skips the check and prints: `afk: warning — dangerous-path check skipped (--i-know-this-is-dangerous, would have matched '<keyword>')`. The would-have-matched info is helpful even when overridden.
 - The keyword list is hardcoded in the script (auditable in PR diffs); not configurable via env or file in this slice.
 
 ## Acceptance criteria

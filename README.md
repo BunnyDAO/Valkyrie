@@ -14,7 +14,7 @@ The goal: **5x your engineers without overcomplicating things** by making them t
   - `/to-issues` — break the PRD into independently-grabbable vertical slices
   - `/tdd` — implement each slice red-green-refactor
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
-- **A `ralph-afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
+- **A `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
 
 ## Install
 
@@ -28,7 +28,7 @@ That's it. It will:
 - Symlink the skills into `~/.claude/skills/`
 - Copy the statusline + stage helper into `~/.claude/valkyrie/`
 - Patch `~/.claude/settings.json` to use the statusline
-- Symlink `ralph-afk` into `~/.local/bin/`
+- Symlink `afk` into `~/.local/bin/`
 
 Restart Claude Code to pick up the new statusline.
 
@@ -71,9 +71,9 @@ You'll get a one-line warning explaining what was skipped.
 Once `to-issues` has saved a list to `issues/`, run the loop:
 
 ```bash
-ralph-afk 10                                       # 10 iters; defaults: 4h cap, $50 cap, claude CLI
-ralph-afk 10 --cli codex                           # same, but use codex
-ralph-afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budget
+afk 10                                       # 10 iters; defaults: 4h cap, $50 cap, claude CLI
+afk 10 --cli codex                           # same, but use codex
+afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budget
 ```
 
 **Inputs:**
@@ -112,7 +112,7 @@ Valkyrie/
 │   ├── zoom-out/              # re-orient on unfamiliar code
 │   └── refactor-spaghetti/    # find deepening opportunities
 └── scripts/
-    └── ralph-afk              # autonomous loop, claude or codex
+    └── afk              # autonomous loop, claude or codex
 ```
 
 ## Credits

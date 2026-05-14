@@ -8,7 +8,7 @@ set -u
 
 TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO_ROOT:-$(dirname "$TEST_DIR")}"
-RALPH_AFK="$REPO/scripts/ralph-afk"
+RALPH_AFK="$REPO/scripts/afk"
 STUBS="$TEST_DIR/stubs"
 FIXTURE_ISSUES="$TEST_DIR/fixtures/smoke/issues"
 
@@ -55,7 +55,7 @@ W="$(new_workdir)"; OUT="$W/run.out"
 ( cd "$W" && PATH="$STUBS:$PATH" "$RALPH_AFK" --no-confirm 2 --max-hours 0.5 >"$OUT" 2>&1 )
 [ $? -eq 0 ] || fail "case 3: nonzero exit"
 assert_match "$OUT" "0h30m"
-assert_match "$OUT" "ralph-afk: stopped"
+assert_match "$OUT" "afk: stopped"
 assert_match "$OUT" "reason:"
 rm -rf "$W"
 
