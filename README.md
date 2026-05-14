@@ -52,6 +52,8 @@ Valkyrie's statusline auto-detects `~/.claude/ccstatusbar.py` and delegates to i
 
 ## How to use
 
+For the full end-to-end flow (interactive + AFK + config gates), see [`docs/workflow.md`](docs/workflow.md).
+
 ### Standard flow
 
 Just describe what you want to build:
