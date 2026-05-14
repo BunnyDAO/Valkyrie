@@ -53,10 +53,15 @@ Follow the official installation guide at [claude.ai/code](https://claude.ai/cod
 
 ```bash
 # Git Bash or WSL
-cd ~
-git clone https://github.com/BunnyDAO/Valkyrie.git valkyrie
-cd valkyrie
+git clone https://github.com/BunnyDAO/Valkyrie.git
+cd Valkyrie
 ```
+
+> **Note:** This clones to your current directory. To clone to your home directory instead, use:
+> ```bash
+> git clone https://github.com/BunnyDAO/Valkyrie.git ~/valkyrie
+> cd ~/valkyrie
+> ```
 
 ### 2. Run the Installer
 

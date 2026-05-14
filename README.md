@@ -25,10 +25,12 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 ## Install
 
 ```bash
-git clone https://github.com/BunnyDAO/Valkyrie.git ~/valkyrie
-cd ~/valkyrie
+git clone https://github.com/BunnyDAO/Valkyrie.git
+cd Valkyrie
 ./install.sh
 ```
+
+> **Note:** This clones to your current directory. To clone to a specific location (e.g., your home directory), use `git clone https://github.com/BunnyDAO/Valkyrie.git ~/valkyrie && cd ~/valkyrie`
 
 That's it. It will:
 - Symlink the skills into `~/.claude/skills/`
