@@ -1,6 +1,10 @@
 # Valkyrie
 
-<img width="563" height="759" alt="Screenshot 2026-05-13 at 8 35 18 PM" src="https://github.com/user-attachments/assets/3efca85e-34ce-4d72-b1a0-70b008beaef9" />
+<div align="center">
+  <img width="563" height="759" 
+       alt="Valkyrie slaying Tech Debt" 
+       src="https://github.com/user-attachments/assets/3efca85e-34ce-4d72-b1a0-70b008beaef9" />
+</div>
 
 A hard-enforced, design-first AI coding workflow for Claude Code (and Codex CLI). Forces every coding request through the same four stages — DESIGN → PRD → ISSUES → TDD — and shows you which one you're in via a statusline that lives at the bottom of your terminal.
 
