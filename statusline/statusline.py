@@ -77,8 +77,8 @@ def red(t: str) -> str:
 # enforced workflow in /valk.
 STAGE_DISPLAY = {
     "idle":     ("IDLE",     dim),
-    "design":   ("DESIGN",   blue),    # grill-me
-    "grill-me": ("DESIGN",   blue),    # alias
+    "design":          ("DESIGN", blue),  # grill-with-docs
+    "grill-with-docs": ("DESIGN", blue),  # alias
     "prd":      ("PRD",      cyan),    # to-prd
     "to-prd":   ("PRD",      cyan),
     "issues":   ("ISSUES",   cyan),    # to-issues

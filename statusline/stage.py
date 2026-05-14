@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 VALID_STAGES = {
-    "idle", "design", "grill-me", "prd", "to-prd",
+    "idle", "design", "grill-with-docs", "prd", "to-prd",
     "issues", "to-issues", "tdd", "zoom", "zoom-out",
     "refactor", "afk",
 }
@@ -74,7 +74,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("set", help="set the current stage")
-    s.add_argument("stage", help="stage name (e.g. grill-me, to-prd, tdd)")
+    s.add_argument("stage", help="stage name (e.g. grill-with-docs, to-prd, tdd)")
     s.add_argument("--global", dest="global_", action="store_true",
                    help="write to ~/.claude (not project-local)")
     s.set_defaults(func=cmd_set)

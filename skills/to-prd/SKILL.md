@@ -1,6 +1,6 @@
 ---
 name: to-prd
-description: Turn the current conversation context into a PRD and save it to docs/prd/ (or publish to the issue tracker if one is configured). Use after a grill-me session, when the user says "turn this into a PRD", or when /valk routes here at the PRD stage.
+description: Turn the current conversation context into a PRD and save it to docs/prd/ (or publish to the issue tracker if one is configured). Use after a grill-with-docs session, when the user says "turn this into a PRD", or when /valk routes here at the PRD stage.
 ---
 
 # To PRD
@@ -15,7 +15,7 @@ python3 ~/.claude/valkyrie/stage.py set prd
 
 ## What to do
 
-This skill takes the current conversation context and codebase understanding and produces a PRD. **Do NOT interview the user** — synthesize what you already know from the grilling session. If the conversation does not contain a grilling session, refuse and tell the user to run `/grill-me` first (Valkyrie should already be enforcing this).
+This skill takes the current conversation context and codebase understanding and produces a PRD. **Do NOT interview the user** — synthesize what you already know from the grilling session. If the conversation does not contain a grilling session, refuse and tell the user to run `/grill-with-docs` first (Valkyrie should already be enforcing this).
 
 ## Process
 

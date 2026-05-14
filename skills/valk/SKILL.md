@@ -1,6 +1,6 @@
 ---
 name: valk
-description: Hard-enforced workflow orchestrator. Forces every coding request through grill-me → to-prd → to-issues → tdd before writing any production code. Use when user asks to build a feature, fix a non-trivial bug, or starts any new work. Also triggers automatically when user types /valk, /valkyrie, or asks "build X" / "implement X" / "add a feature".
+description: Hard-enforced workflow orchestrator. Forces every coding request through grill-with-docs → to-prd → to-issues → tdd before writing any production code. Use when user asks to build a feature, fix a non-trivial bug, or starts any new work. Also triggers automatically when user types /valk, /valkyrie, or asks "build X" / "implement X" / "add a feature".
 ---
 
 # Valkyrie — workflow enforcement
@@ -9,7 +9,7 @@ You are operating the **Valkyrie** workflow. Your job is to refuse to skip stage
 
 The stages, in order:
 
-1. **DESIGN** — `grill-me` skill. Stress-test the idea by interviewing the user.
+1. **DESIGN** — `grill-with-docs` skill. Stress-test the idea by interviewing the user.
 2. **PRD** — `to-prd` skill. Synthesize the design into a PRD document.
 3. **ISSUES** — `to-issues` skill. Break the PRD into independently-grabbable vertical slices.
 4. **TDD** — `tdd` skill. Implement each issue red-green-refactor.
@@ -29,7 +29,7 @@ The stages, in order:
 
 - **Never write production code** while stage is `idle`, `design`, `prd`, or `issues`. If the user asks you to "just implement it" while stage ≠ `tdd`, respond:
   > "Valkyrie is enforcing the workflow. We're currently at [STAGE]. The next step is [NEXT]. Want me to run that now?"
-- **Never start `to-prd`** if `grill-me` hasn't happened in this conversation. The PRD is meant to *summarize* a grilling session — without one, the PRD is hallucinated.
+- **Never start `to-prd`** if `grill-with-docs` hasn't happened in this conversation. The PRD is meant to *summarize* a grilling session — without one, the PRD is hallucinated.
 - **Never start `to-issues`** without a written PRD. If no PRD exists in the conversation, run `to-prd` first.
 - **Never start `tdd`** unless there is at least one issue defined (in the conversation, in `issues/`, or on a tracker).
 - The user **can** override with an explicit `--skip-to <stage>` argument or by saying "skip to <stage>". Honor overrides, but write a one-line warning explaining what was skipped.
@@ -39,7 +39,7 @@ The stages, in order:
 When you move to a new stage, write the marker BEFORE invoking the sub-skill:
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set design     # before grill-me
+python3 ~/.claude/valkyrie/stage.py set design     # before grill-with-docs
 python3 ~/.claude/valkyrie/stage.py set prd        # before to-prd
 python3 ~/.claude/valkyrie/stage.py set issues     # before to-issues
 python3 ~/.claude/valkyrie/stage.py set tdd        # before tdd
@@ -65,7 +65,7 @@ For trivial one-line fixes, typo corrections, or single-file edits, you may bypa
 USER: "let's add a billing dashboard"
 YOU: "Starting Valkyrie at DESIGN. I'll grill you on the plan first."
      [stage.py set design]
-     [invoke grill-me skill — interview until shared understanding]
+     [invoke grill-with-docs skill — interview until shared understanding]
      [stage.py set prd]
      [invoke to-prd skill — synthesize the PRD]
      [stage.py set issues]

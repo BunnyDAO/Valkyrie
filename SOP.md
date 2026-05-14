@@ -41,7 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 
 | Artifact | Path | Scope | What it does |
 |---|---|---|---|
-| Skills | `~/.claude/skills/{valk,grill-me,to-prd,to-issues,tdd,zoom-out,refactor-spaghetti}/` | Global | The workflow logic. Symlinks back into the repo, so `git pull` updates them. |
+| Skills | `~/.claude/skills/{valk,grill-with-docs,to-prd,to-issues,tdd,zoom-out,refactor-spaghetti}/` | Global | The workflow logic. Symlinks back into the repo, so `git pull` updates them. |
 | Statusline + stage helper | `~/.claude/valkyrie/{statusline.py,stage.py}` | Global | Renders the ▶ STAGE pill; reads/writes the stage file. |
 | UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Hard enforcement — see §2. |
 | Settings glue | `~/.claude/settings.json` | Global | Wires the statusline + hook. Patched in place. |
@@ -51,7 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 | Issues | `<repo>/issues/0001-*.md` | Per-project | Output of `/to-issues`. Vertical slices with frontmatter. |
 | `afk` binary | `~/.local/bin/afk` → repo | Global | The autonomous loop. Run from any project directory. |
 
-**What's accessible from any directory:** the slash commands (`/valk`, `/grill-me`, etc.), the hook, the statusline, the `afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
+**What's accessible from any directory:** the slash commands (`/valk`, `/grill-with-docs`, etc.), the hook, the statusline, the `afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
 
 To update everything later: `cd ~/valkyrie && git pull && ./install.sh`.
 
@@ -107,7 +107,7 @@ chmod +x ~/.claude/hooks/valk-guard.sh
 ### What it does NOT block
 
 - Prompts that explicitly say `skip valk`, `trivial change`, `one-line fix`, or pass `--skip-to`
-- Prompts that start with `/valk`, `/valkyrie`, `/grill-me`, `/to-prd`, `/to-issues`, `/tdd`, `/zoom-out`, `/refactor-spaghetti`
+- Prompts that start with `/valk`, `/valkyrie`, `/grill-with-docs`, `/to-prd`, `/to-issues`, `/tdd`, `/zoom-out`, `/refactor-spaghetti`
 - Anything submitted while the stage is mid-workflow (the skill itself owns that turf)
 
 ### Smoke test (CLI — proves the script works)
@@ -146,7 +146,7 @@ If you need the hook off for a session, comment out the `hooks` block in `~/.cla
 
 | Stage | Skill | What you do | What you DON'T do |
 |---|---|---|---|
-| **DESIGN** | `/grill-me` | Answer the AI's questions about the plan. One question at a time. | Skip ahead. Outsource thinking. |
+| **DESIGN** | `/grill-with-docs` | Answer the AI's questions about the plan. One question at a time. | Skip ahead. Outsource thinking. |
 | **PRD** | `/to-prd` | Read the PRD it generates. ~5 minutes. Edit anything wrong. | Treat the PRD as a formality. |
 | **ISSUES** | `/to-issues` | Confirm the vertical-slice breakdown. Adjust dependencies. | Accept thick slices that touch one layer only. |
 | **TDD** | `/tdd` | Watch the red-green-refactor loop. Catch test smells. | Let it write all tests upfront — that's horizontal slicing. |
@@ -427,7 +427,7 @@ afk 5
 | Smell | Likely cause | Fix |
 |---|---|---|
 | AI keeps suggesting code while statusline shows ▶ DESIGN | You skipped grilling, jumped to "build it" | Quit the chat. Restart with "let's design X" — make yourself sit through the grill. |
-| PRD is bland, doesn't reflect your decisions | The grilling session was too short | Re-run `/grill-me` with deeper questions. Aim for 15+ exchanges. |
+| PRD is bland, doesn't reflect your decisions | The grilling session was too short | Re-run `/grill-with-docs` with deeper questions. Aim for 15+ exchanges. |
 | AI writes 5 tests before any implementation | Horizontal slicing — anti-pattern | Stop. Tell it: "one test, one impl. Tracer bullet." |
 | Tests break every time you refactor internals | Tests are coupled to implementation | Read `/tdd` SKILL.md. Tests should use public interfaces only. |
 | `afk` keeps marking issues "stuck" | Acceptance criteria too vague, or HITL slice was mismarked AFK | Re-read the issue. Either tighten criteria or change `type: HITL`. |

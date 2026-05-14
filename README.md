@@ -15,7 +15,7 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 - **A stage-aware statusline** — adapted from [moonbox3/ccstatusbar](https://github.com/moonbox3/ccstatusbar). Shows context %, model, git branch, and a colored ▶ STAGE pill.
 - **An orchestrator skill — `/valk`** — the entry point. It hard-enforces the four core workflow skills below, routing every coding request through DESIGN → PRD → ISSUES → TDD in order. Try to skip a stage and it refuses, names the stage you're in, and runs the correct next step instead.
 - **The four core workflow skills** (enforced by `/valk` above), adapted from [mattpocock/skills](https://github.com/mattpocock/skills):
-  - `/grill-me` — interview you relentlessly about your design (DESIGN stage)
+  - `/grill-with-docs` — interview you relentlessly about your design (DESIGN stage)
   - `/to-prd` — synthesize the grilling into a PRD (PRD stage)
   - `/to-issues` — break the PRD into independently-grabbable vertical slices (ISSUES stage)
   - `/tdd` — implement each slice red-green-refactor (TDD stage)
@@ -113,7 +113,7 @@ Valkyrie/
 │   └── stage.py               # tiny CLI for skills to read/write stage state
 ├── skills/
 │   ├── valk/            # master orchestrator (hard enforcement)
-│   ├── grill-me/              # design interrogation
+│   ├── grill-with-docs/              # design interrogation
 │   ├── to-prd/                # PRD synthesis
 │   ├── to-issues/             # vertical-slice issue breakdown
 │   ├── tdd/                   # red-green-refactor

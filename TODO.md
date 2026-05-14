@@ -63,7 +63,7 @@ When all of these land, AFK has the same level of technical enforcement as the i
 ## Skills
 
 - [ ] **Add a `/status` skill** that prints the current stage, recent PRDs in `docs/prd/`, count of open vs done issues, and the last AFK iteration result. One command to know "where am I in this workflow." Reduces the cognitive overhead of multi-day projects.
-- [ ] **Decide whether `/grill-me` should record the transcript.** Right now the PRD is the artifact; the grilling itself is ephemeral. Saving `docs/prd/<slug>.grill.md` would help diffs ("which decision changed?").
+- [ ] **Decide whether `/grill-with-docs` should record the transcript.** Right now the PRD is the artifact; the grilling itself is ephemeral. Saving `docs/prd/<slug>.grill.md` would help diffs ("which decision changed?").
 
 ---
 
