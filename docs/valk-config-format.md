@@ -21,8 +21,8 @@ work_item_id_field: work_item_id  # frontmatter key on issue files (default: wor
 
 # Host-specific config blocks (only relevant if the matching pr_skill needs them)
 azure_devops:
-  org: https://dev.azure.com/RadiantDev
-  project: RadiantAdvanced
+  org: https://dev.azure.com/<your-org>
+  project: <your-project>
   repository: <repo-name>       # if absent, parsed from `git remote get-url origin`
   target_branch: master         # default if absent
 ---
@@ -48,8 +48,8 @@ Only consulted when `pr_skill: to-azure-pr`.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `org` | URL | `https://dev.azure.com/RadiantDev` | Azure DevOps organization URL |
-| `project` | string | `RadiantAdvanced` | Project name |
+| `org` | URL | _no default_ — must be set | Azure DevOps organization URL, e.g. `https://dev.azure.com/<your-org>` |
+| `project` | string | _no default_ — must be set | Project name inside the org |
 | `repository` | string | parsed from `git remote get-url origin` | Repo name or ID inside the project |
 | `target_branch` | string | `master` | Default PR target branch |
 
@@ -63,7 +63,7 @@ Only consulted when `pr_skill: to-azure-pr`.
 | Yes | `to-azure-pr` (skill NOT installed) | STOP with error | STOP iteration with error |
 | Yes | `to-gh-pr` or other unknown | Look for that skill in env; same fallback logic | Same |
 
-## Enforcement of "no impact on non-RadiantDev users"
+## Enforcement of "no impact on repos that haven't opted in"
 
 The default code path through `/tdd` and AFK is the current behavior. The config-gated path only runs when:
 
@@ -74,18 +74,20 @@ A user pulling Valkyrie and running it in a repo without this file gets identica
 
 ## Examples
 
-### Minimal RadiantDev opt-in
+### Minimal Azure DevOps opt-in
 
 ```markdown
 ---
 pr_skill: to-azure-pr
 test_skill: run-truetest
 azure_devops:
-  repository: RadiantAPI.Core
+  org: https://dev.azure.com/<your-org>
+  project: <your-project>
+  repository: <your-repo>
 ---
 ```
 
-Everything else uses defaults (org=RadiantDev, project=RadiantAdvanced, target=master, work item field=`work_item_id`).
+Defaults that still apply (when keys are omitted): `target_branch: master`, `work_item_id_field: work_item_id`.
 
 ### Override target branch and work item field
 
@@ -95,7 +97,9 @@ pr_skill: to-azure-pr
 test_skill: run-truetest
 work_item_id_field: tracker_id
 azure_devops:
-  repository: Teradyne-FGR
+  org: https://dev.azure.com/<your-org>
+  project: <your-project>
+  repository: <your-repo>
   target_branch: develop
 ---
 ```
