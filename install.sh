@@ -76,12 +76,15 @@ import json, os, sys
 from pathlib import Path
 
 settings_path = Path(os.path.expanduser("~/.claude/settings.json"))
-if sys.platform == 'win32':
-    hook_path = str(Path(os.path.expanduser("~/.claude/hooks/valk-guard.sh"))).replace('/', '\\\\')
-    statusline_path = str(Path(os.path.expanduser("~/.claude/valkyrie/statusline.py"))).replace('/', '\\\\')
-else:
-    hook_path = os.path.expanduser("~/.claude/hooks/valk-guard.sh")
-    statusline_path = os.path.expanduser("~/.claude/valkyrie/statusline.py")
+# Use forward slashes for all platforms - Git Bash on Windows understands them
+hook_path = os.path.expanduser("~/.claude/hooks/valk-guard.sh")
+statusline_path = os.path.expanduser("~/.claude/valkyrie/statusline.py")
+
+# On Windows, convert to Git Bash format (/c/Users/... instead of C:Users...)
+if sys.platform == 'win32' and len(hook_path) > 2 and hook_path[1] == ':':
+    # Convert C:Users... to /c/Users/... (using chr(92) for backslash to avoid escaping issues)
+    hook_path = '/' + hook_path[0].lower() + hook_path[2:].replace(chr(92), '/')
+    statusline_path = '/' + statusline_path[0].lower() + statusline_path[2:].replace(chr(92), '/')
 data = {}
 if settings_path.exists() and settings_path.stat().st_size > 0:
     try:
