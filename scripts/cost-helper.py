@@ -114,6 +114,7 @@ def parse_log(logfile: Path) -> dict:
     totals = {"input": 0, "output": 0, "cw5m": 0, "cw1h": 0, "cread": 0}
     saw_usage = False
     reported_cost = None  # last non-null total_cost_usd from a result event
+    api_key_source = None  # from the init event; "none" == subscription/OAuth
 
     with logfile.open() as f:
         for line in f:
@@ -142,6 +143,12 @@ def parse_log(logfile: Path) -> dict:
                     reported_cost = float(ev["total_cost_usd"])
                 except (TypeError, ValueError):
                     pass
+            # Capture apiKeySource from the init event. "none" means the
+            # session ran on a Claude subscription / OAuth login (NOT billed
+            # per token), so total_cost_usd is notional. Real claude always
+            # emits this field; absence only happens in synthetic fixtures.
+            if api_key_source is None and ev.get("apiKeySource") is not None:
+                api_key_source = ev.get("apiKeySource")
             # Pull usage from message events.
             msg = ev.get("message")
             if isinstance(msg, dict) and isinstance(msg.get("usage"), dict):
@@ -161,8 +168,28 @@ def parse_log(logfile: Path) -> dict:
         "model": model,
         "saw_usage": saw_usage,
         "reported_cost": reported_cost,
+        "api_key_source": api_key_source,
         **totals,
     }
+
+
+def resolve_cost_mode(env_mode: str | None, api_key_source: str | None) -> str:
+    """Decide whether to present cost as dollars or token counts.
+
+    - Explicit override via $VALK_COST_MODE = "dollars" | "tokens" wins.
+    - Otherwise "auto": apiKeySource == "none" (subscription / OAuth — not
+      billed per token) => "tokens". Any other value, OR a missing field
+      (synthetic fixtures only; real claude always emits it), => "dollars".
+      Failing toward dollars is the safe default: an API-billed user losing
+      spend visibility is worse than a subscription user seeing a notional
+      figure they can discount.
+    """
+    m = (env_mode or "").strip().lower()
+    if m in ("dollars", "tokens"):
+        return m
+    if (api_key_source or "").strip().lower() == "none":
+        return "tokens"
+    return "dollars"
 
 
 def compute_cost(rate: dict, parsed: dict) -> float:
@@ -211,11 +238,20 @@ def cmd_parse_log(args: list[str]) -> int:
         cost = compute_cost(rate, parsed)
         source = "computed"
 
+    cost_mode = resolve_cost_mode(
+        os.environ.get("VALK_COST_MODE"), parsed.get("api_key_source")
+    )
+    total_tokens = (
+        parsed["input"] + parsed["output"]
+        + parsed["cw5m"] + parsed["cw1h"] + parsed["cread"]
+    )
+
     print(
         f"model={norm} input={parsed['input']} output={parsed['output']} "
         f"cw5m={parsed['cw5m']} cw1h={parsed['cw1h']} cread={parsed['cread']} "
         f"saw_usage={'1' if parsed['saw_usage'] else '0'} "
-        f"cost_usd={fmt_cost(cost)} cost_source={source}"
+        f"cost_usd={fmt_cost(cost)} cost_source={source} "
+        f"cost_mode={cost_mode} total_tokens={total_tokens}"
     )
     return 0
 

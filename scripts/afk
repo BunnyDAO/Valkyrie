@@ -144,6 +144,12 @@ CUMULATIVE_COST="0"
 # (fallback for crash/kill/codex; rates.json is currently placeholder).
 ITERS_COST_REPORTED=0
 ITERS_COST_ESTIMATED=0
+# Token accounting + presentation mode. RUN_COST_MODE flips to "tokens" if
+# any iteration ran under a subscription/OAuth session (apiKeySource:none)
+# or VALK_COST_MODE=tokens. The $ cap is unchanged either way — in token
+# mode it is just a proxy ceiling and the display switches to token counts.
+CUMULATIVE_TOKENS=0
+RUN_COST_MODE="dollars"
 COST_HELPER="$HOME/.claude/valkyrie/cost-helper.py"
 CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,cost_source,pr_url,exit_reason_for_run'
 
@@ -365,6 +371,17 @@ format_elapsed() {
   printf '%dh%02dm' "$h" "$m"
 }
 
+# Human-readable token count: 1500 -> "1.5k", 562332 -> "562.3k",
+# 2_340_000 -> "2.34M". Plain integer under 1000.
+format_tokens() {
+  awk -v n="${1:-0}" 'BEGIN{
+    n=n+0
+    if (n >= 1000000) printf "%.2fM", n/1000000
+    else if (n >= 1000) printf "%.1fk", n/1000
+    else printf "%d", n
+  }'
+}
+
 # Count issues by status field. Empty $ISSUES_DIR returns 0.
 count_status() {
   local target="$1"
@@ -431,18 +448,26 @@ print_summary() {
   echo "afk: stopped — reason: $reason"
   printf "  iterations:    %d / %d\n"  "$ITERS_DONE" "$MAX_ITERS"
   printf "  elapsed:       %s / %s\n"  "$(format_elapsed "$elapsed")" "$(format_elapsed "$cap_total")"
-  printf "  spend:         \$%s / \$%s\n" \
-    "$(awk -v c="$CUMULATIVE_COST" 'BEGIN{printf "%.4f", c+0}')" \
-    "$(awk -v c="$MAX_COST_USD"    'BEGIN{printf "%.2f", c+0}')"
-  # Cost provenance: how much of the spend figure is CLI-reported (accurate)
-  # vs recomputed from placeholder rates.json (estimate).
-  if [ "$ITERS_COST_ESTIMATED" -eq 0 ] && [ "$ITERS_COST_REPORTED" -gt 0 ]; then
-    printf "  cost basis:    reported by CLI (accurate)\n"
-  elif [ "$ITERS_COST_REPORTED" -eq 0 ] && [ "$ITERS_COST_ESTIMATED" -gt 0 ]; then
-    printf "  cost basis:    estimated from rates.json (placeholder — not real \$)\n"
-  elif [ "$ITERS_COST_REPORTED" -gt 0 ] || [ "$ITERS_COST_ESTIMATED" -gt 0 ]; then
-    printf "  cost basis:    mixed — %d reported, %d estimated\n" \
-      "$ITERS_COST_REPORTED" "$ITERS_COST_ESTIMATED"
+  if [ "$RUN_COST_MODE" = "tokens" ]; then
+    printf "  tokens:        %s (cumulative)\n" "$(format_tokens "$CUMULATIVE_TOKENS")"
+    printf "  cap proxy:     \$%s / \$%s (notional — subscription/OAuth, not billed)\n" \
+      "$(awk -v c="$CUMULATIVE_COST" 'BEGIN{printf "%.4f", c+0}')" \
+      "$(awk -v c="$MAX_COST_USD"    'BEGIN{printf "%.2f", c+0}')"
+    printf "  cost basis:    token counts — real constraint is rate limits, not \$\n"
+  else
+    printf "  spend:         \$%s / \$%s\n" \
+      "$(awk -v c="$CUMULATIVE_COST" 'BEGIN{printf "%.4f", c+0}')" \
+      "$(awk -v c="$MAX_COST_USD"    'BEGIN{printf "%.2f", c+0}')"
+    # Cost provenance: how much of the spend figure is CLI-reported (accurate)
+    # vs recomputed from placeholder rates.json (estimate).
+    if [ "$ITERS_COST_ESTIMATED" -eq 0 ] && [ "$ITERS_COST_REPORTED" -gt 0 ]; then
+      printf "  cost basis:    reported by CLI (accurate)\n"
+    elif [ "$ITERS_COST_REPORTED" -eq 0 ] && [ "$ITERS_COST_ESTIMATED" -gt 0 ]; then
+      printf "  cost basis:    estimated from rates.json (placeholder — not real \$)\n"
+    elif [ "$ITERS_COST_REPORTED" -gt 0 ] || [ "$ITERS_COST_ESTIMATED" -gt 0 ]; then
+      printf "  cost basis:    mixed — %d reported, %d estimated\n" \
+        "$ITERS_COST_REPORTED" "$ITERS_COST_ESTIMATED"
+    fi
   fi
   printf "  issues done:   %d\n"        "$done_n"
   printf "  issues stuck:  %d\n"        "$stuck_n"
@@ -616,6 +641,10 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   ITER_COST=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cost_usd=/){sub(/^cost_usd=/,"",$i); print $i; exit}}')
   ITER_COST_SRC=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cost_source=/){sub(/^cost_source=/,"",$i); print $i; exit}}')
   ITER_COST_SRC="${ITER_COST_SRC:-computed}"
+  ITER_COST_MODE=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^cost_mode=/){sub(/^cost_mode=/,"",$i); print $i; exit}}')
+  ITER_COST_MODE="${ITER_COST_MODE:-dollars}"
+  ITER_TOKENS=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^total_tokens=/){sub(/^total_tokens=/,"",$i); print $i; exit}}')
+  ITER_TOKENS="${ITER_TOKENS:-0}"
 
   if [ "$SAW_USAGE" = "0" ]; then
     if [ "$ITER_RC" -ne 0 ]; then
@@ -627,6 +656,11 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
     ITER_COST="0"
   fi
   CUMULATIVE_COST="$(awk -v a="$CUMULATIVE_COST" -v b="${ITER_COST:-0}" 'BEGIN{printf "%.6f", a+b}')"
+  CUMULATIVE_TOKENS=$(( CUMULATIVE_TOKENS + ITER_TOKENS ))
+
+  # If ANY iteration resolved to token-mode (subscription / OAuth), the run
+  # is presented in tokens. The $ cap still applies as a proxy ceiling.
+  [ "$ITER_COST_MODE" = "tokens" ] && RUN_COST_MODE="tokens"
 
   # Track cost provenance for the summary.
   if [ "$ITER_COST_SRC" = "reported" ]; then
@@ -680,11 +714,21 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   ELAPSED=$(( $(date +%s) - START_TS ))
   CAP_SECONDS="$(awk -v h="$MAX_HOURS" 'BEGIN{printf "%d", h*3600}')"
   PCT="$(awk -v c="$CUMULATIVE_COST" -v cap="$MAX_COST_USD" 'BEGIN{printf "%d", (cap+0>0 ? c/cap*100 : 0)}')"
-  printf "iter %d/%d done | elapsed %s / %s | spend \$%.4f / \$%.2f (~%d%%) [%s]\n" \
-    "$iter" "$MAX_ITERS" \
-    "$(format_elapsed "$ELAPSED")" "$(format_elapsed "$CAP_SECONDS")" \
-    "$CUMULATIVE_COST" "$MAX_COST_USD" "$PCT" \
-    "$([ "$ITER_COST_SRC" = "reported" ] && echo "reported" || echo "estimated")"
+  if [ "$RUN_COST_MODE" = "tokens" ]; then
+    # Subscription / OAuth: dollars are notional, so lead with tokens.
+    # The $ cap still governs the loop — shown as a proxy ceiling.
+    printf "iter %d/%d done | elapsed %s / %s | tokens %s (cap proxy \$%.4f / \$%.2f ~%d%%) [subscription]\n" \
+      "$iter" "$MAX_ITERS" \
+      "$(format_elapsed "$ELAPSED")" "$(format_elapsed "$CAP_SECONDS")" \
+      "$(format_tokens "$CUMULATIVE_TOKENS")" \
+      "$CUMULATIVE_COST" "$MAX_COST_USD" "$PCT"
+  else
+    printf "iter %d/%d done | elapsed %s / %s | spend \$%.4f / \$%.2f (~%d%%) [%s]\n" \
+      "$iter" "$MAX_ITERS" \
+      "$(format_elapsed "$ELAPSED")" "$(format_elapsed "$CAP_SECONDS")" \
+      "$CUMULATIVE_COST" "$MAX_COST_USD" "$PCT" \
+      "$([ "$ITER_COST_SRC" = "reported" ] && echo "reported" || echo "estimated")"
+  fi
 
   # Cost-cap check at iteration boundary.
   if awk -v c="$CUMULATIVE_COST" -v cap="$MAX_COST_USD" 'BEGIN{exit !(c+0 >= cap+0)}' </dev/null; then

@@ -284,6 +284,21 @@ The per-iter line and the final summary tell you which basis was used (`[reporte
 
 > **Subscription vs API — read this before quoting a dollar figure.** If engineers run `claude` via a Claude **subscription** (Pro/Max/Team) rather than an API key, `total_cost_usd` is a *notional API-equivalent* value for usage that was **not billed per-token at all** (the AFK session shows `apiKeySource: none`). In that mode neither the reported nor the estimated number is money that left the company. The real constraint is **rate-limit consumption** — AFK competing with engineers' interactive sessions for the shared 5-hour / weekly limits. When reporting AFK economics for a subscription team, frame it as "consumed X% of our rate-limit budget and produced N PRs," not "spent $X." Quoting a dollar figure for subscription usage is a category error that will mislead the rollout decision.
 
+**This is now automatic — `cost_mode`.** AFK no longer just warns; it presents the right unit:
+
+- **`dollars`** — per-iter line shows `spend $X / $Y`, summary shows `spend:` + `cost basis:`. Use this on the **commercial API account** (real per-token billing).
+- **`tokens`** — per-iter line shows `tokens 2.34M (cap proxy $X / $Y) [subscription]`, summary shows `tokens:` + `cap proxy:` + `cost basis: token counts — real constraint is rate limits`. Use this for **personal Pro/Max** runs where dollars are notional.
+
+Selection (`VALK_COST_MODE` env var):
+
+| Value | Behavior |
+|---|---|
+| unset / `auto` (default) | `apiKeySource: none` → **tokens**; any other value (API key) or absent → **dollars**. Real `claude` always emits `apiKeySource`, so auto is correct in practice. |
+| `tokens` | force token display regardless of auth |
+| `dollars` | force dollar display regardless of auth |
+
+Set it per-machine in your shell rc. **Commercial-API teammates**: leave unset (auto detects the API key → dollars) or `export VALK_COST_MODE=dollars` to be explicit. **Personal Pro/Max**: `export VALK_COST_MODE=tokens` so notional dollars never mislead you. The `$` cap (`--max-cost-usd`) is unchanged in both modes — in token mode it remains a proxy ceiling that still stops runaway loops; only the *display* differs.
+
 **Hard refusals** (loop exits non-zero) when budget tracking can't be trusted:
 - Estimated path only: `rates.json` missing or malformed → fix and re-run `./install.sh`. (The reported path does not need `rates.json`.)
 - Estimated path only: an iteration emits a model not in `rates.json` (after stripping `-YYYYMMDD` and `[…]` context suffixes) → add the model to `rates.json`, commit, `./install.sh`.

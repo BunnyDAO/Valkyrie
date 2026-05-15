@@ -143,4 +143,50 @@ HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/reported-cost.log" >"$OUT" 2>&1
 grep -q "cost_usd=0.4242" "$OUT" || fail "case 9: cost — got $(cat "$OUT")"
 rm -rf "$H"
 
+# ---------------------------------------------------------------------------
+# 10. cost_mode auto-detect: apiKeySource "none" → tokens.
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/subscription.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 10: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_mode=tokens" "$OUT" || fail "case 10: apiKeySource none should auto → tokens — got $(cat "$OUT")"
+grep -q "total_tokens=1500" "$OUT" || fail "case 10: total_tokens — got $(cat "$OUT")"
+rm -rf "$H"
+
+# ---------------------------------------------------------------------------
+# 11. cost_mode auto-detect: apiKeySource an API key → dollars.
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/api-billed.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 11: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_mode=dollars" "$OUT" || fail "case 11: API key should auto → dollars — got $(cat "$OUT")"
+rm -rf "$H"
+
+# ---------------------------------------------------------------------------
+# 12. cost_mode auto-detect: missing apiKeySource (synthetic) → dollars (safe).
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/opus-simple.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 12: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_mode=dollars" "$OUT" || fail "case 12: missing apiKeySource should default → dollars — got $(cat "$OUT")"
+rm -rf "$H"
+
+# ---------------------------------------------------------------------------
+# 13. VALK_COST_MODE env overrides auto-detect, both directions.
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+# Force tokens on an API-key fixture (auto would say dollars).
+HOME="$H" VALK_COST_MODE=tokens "$RALPH_AFK" --debug-cost "$COST_FIX/api-billed.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 13a: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_mode=tokens" "$OUT" || fail "case 13a: env tokens must override auto-dollars — got $(cat "$OUT")"
+# Force dollars on a subscription fixture (auto would say tokens).
+HOME="$H" VALK_COST_MODE=dollars "$RALPH_AFK" --debug-cost "$COST_FIX/subscription.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 13b: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_mode=dollars" "$OUT" || fail "case 13b: env dollars must override auto-tokens — got $(cat "$OUT")"
+rm -rf "$H"
+
 echo "cost tests ok"

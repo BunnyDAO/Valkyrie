@@ -92,6 +92,8 @@ afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budge
 - **`--max-cost-usd <USD>`** — spend cap. Default `50`. Uses the CLI's own `total_cost_usd` when reported (accurate); falls back to recomputing from token usage × placeholder rates in `~/.claude/valkyrie/rates.json` only when the CLI doesn't report one (crash/kill/timeout, or the `codex` CLI). Each iteration's basis is shown as `[reported]` or `[estimated]`. **Under a Claude subscription (not API key) this figure is notional, not a bill** — see SOP §7.
 - **`--cli claude|codex`** — which CLI to drive. Default `claude`.
 
+**`VALK_COST_MODE`** (env var, not a flag) — `auto` (default), `dollars`, or `tokens`. `auto` shows tokens when the run is on a Claude subscription (`apiKeySource: none` — dollars would be notional) and dollars when it's billed via an API key. Set `export VALK_COST_MODE=tokens` on a personal Pro/Max machine; commercial-API teammates leave it unset or set `dollars`. The `--max-cost-usd` cap is unchanged in both modes (a proxy ceiling in token mode). See SOP §7.
+
 The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration row (including `cost_source`) is appended to `.claude/valk/afk-cost-history.csv`.
 
 ### Per-project config (opt-in PR workflow)
