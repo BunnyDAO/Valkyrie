@@ -471,6 +471,25 @@ A: Yes. Remove the `hooks` block from `~/.claude/settings.json` and restart. The
 
 The workflow only delivers 5x if more than one person uses it. The friction is also social — engineers who are halfway in, half out, will undermine the discipline. Treat the rollout as a change-management exercise, not a tool install.
 
+### Phase 0 — Pre-rollout gate (run before pilot)
+
+Before letting anyone outside the maintainer team install Valkyrie, the maintainer runs the full test pyramid and the manual smoke. If any layer fails, fix it before continuing.
+
+```bash
+# Layer 1 — stub-based unit suite. Free, deterministic. Must pass 6/6.
+bash test/run-tests.sh
+
+# Layer 2 — real-Claude integration suite. ~$1 per full run.
+# Captures hook traces to test/integration/last-run/<scenario>/reports/trace.jsonl
+# for offline audit.
+bash test/run-integration-tests.sh
+
+# Layer 3 — manual interactive smoke. ~15 min, ~$2–5.
+# Run both variants in test/integration/MANUAL-SMOKE.md (no config + missing-PR-skill).
+```
+
+After Layer 2, review the trace files for unexpected tool calls (e.g. file modifications outside the issue's named files, or subagent spawns the slice didn't require). Anything surprising → file an issue and block the pilot until resolved. Anything expected but unfamiliar → note it for the lunch-and-learn.
+
 ### Phase 1 — Pilot (week 1)
 
 - **Pick 3–5 engineers** who already write good PRDs and complain about AI-generated slop. They'll be your evangelists.

@@ -1,0 +1,13 @@
+{
+  "_comment": "Template — run-integration.sh substitutes __VALK_LOG_HOOK__ with the absolute path to log-hook.py at fixture-copy time.",
+  "hooks": {
+    "SessionStart": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event SessionStart" }] }],
+    "SessionEnd":   [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event SessionEnd" }] }],
+    "UserPromptSubmit": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event UserPromptSubmit" }] }],
+    "Notification": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event Notification" }] }],
+    "Stop":         [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event Stop" }] }],
+    "SubagentStop": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event SubagentStop" }] }],
+    "PreToolUse":   [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event PreToolUse" }] }],
+    "PostToolUse":  [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "python3 \"__VALK_LOG_HOOK__\" --event PostToolUse" }] }]
+  }
+}

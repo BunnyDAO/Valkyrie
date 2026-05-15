@@ -52,9 +52,18 @@ def load_rates(path: Path | None = None) -> dict:
 # Strip a trailing -YYYYMMDD date suffix from a model name.
 _DATE_SUFFIX_RE = re.compile(r"-\d{8}$")
 
+# Strip a trailing context-window suffix like "[1m]" or "[200k]". The
+# extended-context variants don't have their own published rates in rates.json;
+# fall back to the base model's pricing (slight underestimate for 1M Opus, but
+# better than failing the run).
+_CONTEXT_SUFFIX_RE = re.compile(r"\[[^\]]+\]$")
+
 
 def normalize_model(name: str) -> str:
-    return _DATE_SUFFIX_RE.sub("", name or "")
+    n = name or ""
+    n = _CONTEXT_SUFFIX_RE.sub("", n)
+    n = _DATE_SUFFIX_RE.sub("", n)
+    return n
 
 
 def find_model_rates(rates: dict, model: str) -> dict:

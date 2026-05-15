@@ -110,13 +110,18 @@ CSV_PATH="$REPO/.claude/valk/afk-cost-history.csv"
 mkdir -p "$LOG_DIR"
 
 # Per-project config — empty PR_SKILL = pre-config behavior (current default).
-# When set, "done" is derived from PR + CI state, not the issue frontmatter
-# field. See docs/valk-config-format.md.
+# When set to a real skill name, "done" is derived from PR + CI state, not the
+# issue frontmatter field. The literal value "none" is treated as unset (so a
+# repo can explicitly opt OUT in its config without removing the file). See
+# docs/valk-config-format.md.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 READ_CONFIG="$SCRIPT_DIR/read-valk-config.sh"
 PR_SKILL=""
 if [ -x "$READ_CONFIG" ]; then
-  PR_SKILL="$("$READ_CONFIG" --repo "$REPO" pr_skill 2>/dev/null || true)"
+  RAW="$("$READ_CONFIG" --repo "$REPO" pr_skill 2>/dev/null || true)"
+  if [ -n "$RAW" ] && [ "$RAW" != "none" ]; then
+    PR_SKILL="$RAW"
+  fi
 fi
 
 if [ ! -d "$ISSUES_DIR" ]; then

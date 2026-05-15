@@ -122,6 +122,15 @@ Full format spec: [`docs/valk-config-format.md`](docs/valk-config-format.md).
 
 Both update the stage and restore it when done.
 
+### Testing
+
+Two layers:
+
+- **`bash test/run-tests.sh`** — stub-based unit suite. Free, deterministic, fast. Covers cost caps, time caps, guardrails, CSV format. Run on every change.
+- **`bash test/run-integration-tests.sh`** — real-Claude integration suite. Costs ~$1 per full run. Drives `afk` against fixture repos with hook traces captured to `test/integration/last-run/<scenario>/reports/trace.jsonl` for offline audit. Run manually before any rollout.
+
+The full interactive flow (DESIGN → PRD → ISSUES → TDD with a human in the loop) has a manual smoke procedure documented in [`test/integration/MANUAL-SMOKE.md`](test/integration/MANUAL-SMOKE.md) — ~15 min, ~$2–5 in API credits.
+
 ## Project layout
 
 ```
