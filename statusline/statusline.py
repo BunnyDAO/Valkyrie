@@ -189,15 +189,46 @@ def git_segment(cwd: Path) -> str | None:
 
 
 def ctx_segment(payload: dict) -> str | None:
-    """Approximate context usage from session.tokens if present."""
-    session = payload.get("session") or {}
-    tokens = session.get("tokens") or session.get("token_count")
-    limit = session.get("context_window") or session.get("token_limit") or 1_000_000
-    if not tokens:
+    """Real context-window usage from Claude Code's `context_window` object.
+
+    Schema (verified against code.claude.com/docs/en/statusline):
+      context_window.used_percentage        pre-calculated % used
+      context_window.total_input_tokens     tokens in context (incl. cache)
+      context_window.total_output_tokens
+      context_window.context_window_size    200000, or 1000000 extended
+      exceeds_200k_tokens                   bool
+
+    Renders e.g.  ctx:42% (84k/200k)  — colored green/yellow/red by how
+    much is USED UP, with a ⚠ marker once past the 200k threshold.
+    """
+    cw = payload.get("context_window") or {}
+    if not cw:
         return None
-    pct = int(round(100 * tokens / limit))
-    color = green if pct < 70 else (yellow if pct < 90 else red)
-    return color(f"ctx:{pct}%") + dim(f"({tokens // 1000}k/{limit // 1000}k)")
+
+    size = cw.get("context_window_size") or 0
+    used_tok = (cw.get("total_input_tokens") or 0) + (cw.get("total_output_tokens") or 0)
+
+    # Prefer Claude's pre-calculated percentage; fall back to computing it.
+    pct = cw.get("used_percentage")
+    if pct is None:
+        if not size:
+            return None
+        pct = 100.0 * used_tok / size
+    pct = float(pct)
+
+    pct_i = int(round(pct))
+    # Color reflects how much is GONE: green plenty left, red almost full.
+    color = green if pct_i < 70 else (yellow if pct_i < 90 else red)
+
+    if size:
+        body = f"ctx:{pct_i}% " + dim(f"({used_tok // 1000}k/{size // 1000}k used)")
+    else:
+        body = f"ctx:{pct_i}% used"
+
+    seg = color(body)
+    if payload.get("exceeds_200k_tokens"):
+        seg += " " + red("⚠200k+")
+    return seg
 
 
 def model_segment(payload: dict) -> str:
