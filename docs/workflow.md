@@ -141,7 +141,8 @@ afk N --max-hours H --max-cost-usd USD --cli claude|codex
 │   CLI EXITS                                                     │
 │        │                                                        │
 │        ▼                                                        │
-│   PARSE log → cost-helper.py → append CSV row (with pr_url)     │
+│   PARSE log → cost-helper.py (reported $ or estimated)         │
+│              → append CSV row (cost_source, pr_url)             │
 │        │                                                        │
 │        ▼                                                        │
 │   DONE-CHECK (gated by PR_SKILL):                               │

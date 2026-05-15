@@ -11,7 +11,7 @@ STUBS="$TEST_DIR/stubs"
 COST_FIX="$TEST_DIR/fixtures/cost"
 ISSUE_FIX="$TEST_DIR/fixtures/smoke/issues"
 
-CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,pr_url,exit_reason_for_run'
+CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,cost_source,pr_url,exit_reason_for_run'
 
 fail() { echo "FAIL: $*"; [ -n "${OUT:-}" ] && [ -f "$OUT" ] && { echo "--- stdout ---"; cat "$OUT"; }; exit 1; }
 
@@ -74,15 +74,15 @@ rows=$(($(wc -l < "$csv") - 1))
 rm -rf "$H" "$W"
 
 # ---------------------------------------------------------------------------
-# 3. Each row has exactly 12 comma-separated fields (added pr_url).
+# 3. Each row has exactly 13 comma-separated fields (added cost_source + pr_url).
 # ---------------------------------------------------------------------------
 H="$(mktemp -d)"; W="$(new_workdir)"; OUT="$W/run.out"
 make_fake_home "$H"
 STUB_FIXTURE="$COST_FIX/opus-simple.log" run_ra "$RALPH_AFK" 2
 [ $? -eq 0 ] || fail "case 3: nonzero exit"
 csv="$W/$CSV_REL"
-# Each data row should have 11 commas (12 fields). awk counts.
-awk -F, 'NR>1 && NF != 12 { print "row "NR" has "NF" fields, expected 12"; exit 1 }' "$csv" \
+# Each data row should have 12 commas (13 fields). awk counts.
+awk -F, 'NR>1 && NF != 13 { print "row "NR" has "NF" fields, expected 13"; exit 1 }' "$csv" \
   || fail "case 3: row field count mismatch"
 rm -rf "$H" "$W"
 

@@ -1,5 +1,5 @@
 {
-  "_note": "Placeholder rates. Real published prices land in issue 0006 (HITL).",
+  "_note": "FALLBACK-ONLY. cost-helper.py prefers the CLI's own total_cost_usd (cost_source=reported) and only falls back to these rates when the result event is absent (crash/kill/timeout) or for CLIs that don't emit a cost (codex). Values are still PLACEHOLDER and overestimate — safe for a conservative cap, NOT a real bill. Real published prices: issue 0006 (HITL).",
   "_last_verified": "PLACEHOLDER",
   "_sources": [
     "https://www.anthropic.com/pricing",

@@ -271,16 +271,23 @@ Three independent caps run concurrently. Whichever crosses first wins; the final
 |---|---|---|---|
 | Iterations | required positional `N` | — | `N` iterations completed |
 | Wall-clock time | **4 hours** | `--max-hours <h>` (decimals OK) | `now - start >= h × 3600` checked at iter boundary |
-| Estimated USD spend | **$50.00** | `--max-cost-usd <usd>` | cumulative parsed-token cost ≥ cap, checked at iter boundary |
+| USD spend | **$50.00** | `--max-cost-usd <usd>` | cumulative cost ≥ cap, checked at iter boundary (reported cost when available, else estimated — see below) |
 
 **Caps are checked at iteration boundaries**, never mid-iter. The current iteration always finishes cleanly, so a cap can be overshot by one iter's worth of work. That's the right trade-off — killing mid-iter would leave issues in a half-modified state.
 
-**Estimated, not billed.** Cost is computed by parsing `usage` events from claude `stream-json` output and multiplying by per-million-token rates from `~/.claude/valkyrie/rates.json`. If Anthropic gives you tier discounts or volume pricing, the real bill diverges from our estimate. Treat the cap as a safety rail, not a precise meter.
+**How cost is determined (layered).** Each iteration's log is scanned for the CLI's own `total_cost_usd` (the terminal `result` event — Anthropic's client-side estimate):
+
+- **Reported** (`cost_source=reported`): if `total_cost_usd > 0` is present, that value is used verbatim. `rates.json` is not consulted. This is the accurate path and the default for the `claude` CLI.
+- **Estimated** (`cost_source=estimated`): if the result event is absent (crash / kill / timeout) or `total_cost_usd` is `0.0`, or the CLI is `codex` (no cost field), cost is recomputed from `usage` events × per-million-token rates in `~/.claude/valkyrie/rates.json`. **`rates.json` is placeholder data and deliberately overestimates** — fine as a conservative cap, not a real bill.
+
+The per-iter line and the final summary tell you which basis was used (`[reported]` / `[estimated]`, and a `cost basis:` line in the summary). If the summary says `estimated from rates.json (placeholder — not real $)`, the dollar figure is a safety-rail number, not your invoice.
+
+> **Subscription vs API — read this before quoting a dollar figure.** If engineers run `claude` via a Claude **subscription** (Pro/Max/Team) rather than an API key, `total_cost_usd` is a *notional API-equivalent* value for usage that was **not billed per-token at all** (the AFK session shows `apiKeySource: none`). In that mode neither the reported nor the estimated number is money that left the company. The real constraint is **rate-limit consumption** — AFK competing with engineers' interactive sessions for the shared 5-hour / weekly limits. When reporting AFK economics for a subscription team, frame it as "consumed X% of our rate-limit budget and produced N PRs," not "spent $X." Quoting a dollar figure for subscription usage is a category error that will mislead the rollout decision.
 
 **Hard refusals** (loop exits non-zero) when budget tracking can't be trusted:
-- `rates.json` missing or malformed → fix and re-run `./install.sh`.
-- An iteration emits a model name not in `rates.json` (after stripping the `-YYYYMMDD` suffix) → add the model to `rates.json`, commit, `./install.sh`.
-- An iteration's CLI exits non-zero with no `usage` events → loop exits with `reason: cost tracking failed` and names the offending log file.
+- Estimated path only: `rates.json` missing or malformed → fix and re-run `./install.sh`. (The reported path does not need `rates.json`.)
+- Estimated path only: an iteration emits a model not in `rates.json` (after stripping `-YYYYMMDD` and `[…]` context suffixes) → add the model to `rates.json`, commit, `./install.sh`.
+- An iteration's CLI exits non-zero with no `usage` events AND no reported cost → loop exits with `reason: cost tracking failed` and names the offending log file.
 
 A clean exit (code 0) with no `usage` events is treated as $0 and the loop continues — that's a legitimate no-op.
 
@@ -356,8 +363,10 @@ The `reason:` field takes one of: `no more issues`, `iteration cap hit`, `time c
 Each completed iteration appends one row to `<repo>/.claude/valk/afk-cost-history.csv`:
 
 ```
-timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,exit_reason_for_run
+timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,cost_source,pr_url,exit_reason_for_run
 ```
+
+`cost_source` is `reported` (CLI's own `total_cost_usd` — accurate) or `estimated` (recomputed from placeholder `rates.json`). When analyzing spend across runs, filter on this: only `reported` rows are real-dollar figures, and only under API-key billing (see the subscription caveat above).
 
 The file accumulates across runs (header on first creation, append thereafter). Only the **last row of each run** has `exit_reason_for_run` populated; earlier rows from the same run leave it empty. After a few sprints of use, this is the data you tune your defaults on — rather than guessing whether `--max-cost-usd 50` is too tight or too generous.
 

@@ -89,10 +89,10 @@ afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budge
 **Inputs:**
 - **N** (positional, required) — max iterations to run.
 - **`--max-hours <H>`** — wall-clock cap. Default `4`. Loop exits at the next iteration boundary once hit.
-- **`--max-cost-usd <USD>`** — estimated-spend cap. Default `50`. Computed from token usage × per-million rates in `~/.claude/valkyrie/rates.json`.
+- **`--max-cost-usd <USD>`** — spend cap. Default `50`. Uses the CLI's own `total_cost_usd` when reported (accurate); falls back to recomputing from token usage × placeholder rates in `~/.claude/valkyrie/rates.json` only when the CLI doesn't report one (crash/kill/timeout, or the `codex` CLI). Each iteration's basis is shown as `[reported]` or `[estimated]`. **Under a Claude subscription (not API key) this figure is notional, not a bill** — see SOP §7.
 - **`--cli claude|codex`** — which CLI to drive. Default `claude`.
 
-The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration cost row is appended to `.claude/valk/afk-cost-history.csv`.
+The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration row (including `cost_source`) is appended to `.claude/valk/afk-cost-history.csv`.
 
 ### Per-project config (opt-in PR workflow)
 

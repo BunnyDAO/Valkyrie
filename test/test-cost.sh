@@ -117,4 +117,30 @@ RC=$?
 [ "$RC" -ne 0 ] || fail "case 7: should have exited non-zero on malformed rates.json"
 rm -rf "$H"
 
+# ---------------------------------------------------------------------------
+# 8. Reported path: a result event with total_cost_usd > 0 wins over rates.
+#    Fixture uses an UNKNOWN model on purpose — the reported path must NOT
+#    consult rates.json, so an unknown model is not an error here.
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/reported-cost.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 8: nonzero exit — got $(cat "$OUT")"
+grep -q "cost_usd=0.4242"     "$OUT" || fail "case 8: should use reported 0.4242 — got $(cat "$OUT")"
+grep -q "cost_source=reported" "$OUT" || fail "case 8: cost_source should be reported — got $(cat "$OUT")"
+rm -rf "$H"
+
+# ---------------------------------------------------------------------------
+# 9. Reported path needs no rates.json at all. Same fixture, but rates.json
+#    is absent — must still succeed (unlike case 6's computed path).
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+mkdir -p "$H/.claude/valkyrie"
+cp "$REPO/scripts/cost-helper.py" "$H/.claude/valkyrie/cost-helper.py"
+# Note: NOT copying rates.json — the reported path must not need it.
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/reported-cost.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 9: reported path must not require rates.json — got $(cat "$OUT")"
+grep -q "cost_usd=0.4242" "$OUT" || fail "case 9: cost — got $(cat "$OUT")"
+rm -rf "$H"
+
 echo "cost tests ok"

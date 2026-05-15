@@ -102,13 +102,18 @@ def parse_usage_event(usage: dict) -> tuple[int, int, int, int, int]:
 
 def parse_log(logfile: Path) -> dict:
     """
-    Read a stream-json log file. Sum usage across all message events.
-    Returns dict with model, input, output, cw5m, cw1h, cread.
-    Raises if the log has no usage events at all.
+    Read a stream-json log file. Sum usage across all message events AND
+    capture the CLI's self-reported `total_cost_usd` from the terminal
+    `result` event (Anthropic's own client-side estimate).
+
+    Returns dict with model, input, output, cw5m, cw1h, cread, saw_usage,
+    and reported_cost (float, or None if no result event carried one).
+    Raises if the log has no model field at all.
     """
     model = ""
     totals = {"input": 0, "output": 0, "cw5m": 0, "cw1h": 0, "cread": 0}
     saw_usage = False
+    reported_cost = None  # last non-null total_cost_usd from a result event
 
     with logfile.open() as f:
         for line in f:
@@ -129,6 +134,14 @@ def parse_log(logfile: Path) -> dict:
                     m = msg.get("model")
                     if m:
                         model = m
+            # Capture the CLI's own cost estimate from the result event.
+            # (Anthropic CLI only; codex won't emit this — that's fine,
+            #  reported_cost stays None and we fall back to recompute.)
+            if ev.get("type") == "result" and "total_cost_usd" in ev:
+                try:
+                    reported_cost = float(ev["total_cost_usd"])
+                except (TypeError, ValueError):
+                    pass
             # Pull usage from message events.
             msg = ev.get("message")
             if isinstance(msg, dict) and isinstance(msg.get("usage"), dict):
@@ -147,6 +160,7 @@ def parse_log(logfile: Path) -> dict:
     return {
         "model": model,
         "saw_usage": saw_usage,
+        "reported_cost": reported_cost,
         **totals,
     }
 
@@ -176,17 +190,32 @@ def cmd_parse_log(args: list[str]) -> int:
         sys.stderr.write(f"error: log file not found: {logfile}\n")
         return 2
 
-    rates = load_rates()
     parsed = parse_log(logfile)
-    rate = find_model_rates(rates, parsed["model"])
-    cost = compute_cost(rate, parsed)
     norm = normalize_model(parsed["model"])
+
+    # Layered cost model:
+    #  - PRIMARY: the CLI's own total_cost_usd, when present AND > 0.
+    #    A 0.0 is treated as "not reported" (placeholder / no-op iteration);
+    #    a real working iteration always reports > 0. On this path we do NOT
+    #    consult rates.json at all — Anthropic already priced it.
+    #  - FALLBACK: recompute from token usage x rates.json. Triggered when
+    #    the result event is absent (crash/kill/timeout) or carried 0.0,
+    #    or for non-Anthropic CLIs (codex) that don't emit total_cost_usd.
+    reported = parsed.get("reported_cost")
+    if reported is not None and reported > 0:
+        cost = reported
+        source = "reported"
+    else:
+        rates = load_rates()
+        rate = find_model_rates(rates, parsed["model"])
+        cost = compute_cost(rate, parsed)
+        source = "computed"
 
     print(
         f"model={norm} input={parsed['input']} output={parsed['output']} "
         f"cw5m={parsed['cw5m']} cw1h={parsed['cw1h']} cread={parsed['cread']} "
         f"saw_usage={'1' if parsed['saw_usage'] else '0'} "
-        f"cost_usd={fmt_cost(cost)}"
+        f"cost_usd={fmt_cost(cost)} cost_source={source}"
     )
     return 0
 
