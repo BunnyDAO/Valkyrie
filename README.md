@@ -16,7 +16,7 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 - **An orchestrator skill — `/valk`** — the entry point. It hard-enforces the four core workflow skills below, routing every coding request through DESIGN → PRD → ISSUES → TDD in order. Try to skip a stage and it refuses, names the stage you're in, and runs the correct next step instead.
 - **The four core workflow skills** (enforced by `/valk` above), adapted from [mattpocock/skills](https://github.com/mattpocock/skills):
   - `/grill-with-docs` — interview you relentlessly about your design (DESIGN stage)
-  - `/to-prd` — synthesize the grilling into a PRD (PRD stage)
+  - `/to-prd` — synthesize the grilling into a PRD, then **gate**: surface the decisions inline and refuse to proceed until you substantively approve or redline (PRD + PRD-REVIEW)
   - `/to-issues` — break the PRD into independently-grabbable vertical slices (ISSUES stage)
   - `/tdd` — implement each slice red-green-refactor (TDD stage)
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
@@ -60,7 +60,7 @@ Just describe what you want to build:
 
 > "Let's add a billing dashboard."
 
-`/valk` activates automatically. The statusline switches to **▶ DESIGN** and Claude starts grilling you. When you've resolved the decision tree, it moves to **▶ PRD**, then **▶ ISSUES**, then **▶ TDD**.
+`/valk` activates automatically. The statusline switches to **▶ DESIGN** and Claude starts grilling you. When you've resolved the decision tree, it moves to **▶ PRD**, then **stops at ▶ REVIEW-PRD** — it shows you the PRD's decisions inline and won't continue until you engage with them (a bare "yes" is rejected). After you approve, **▶ ISSUES**, then **▶ TDD**.
 
 If at any point you try to skip ahead — *"just write it"* — Claude will refuse, tell you what stage you're in, and offer to run the next correct step.
 

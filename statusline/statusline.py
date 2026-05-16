@@ -81,6 +81,7 @@ STAGE_DISPLAY = {
     "grill-with-docs": ("DESIGN", blue),  # alias
     "prd":      ("PRD",      cyan),    # to-prd
     "to-prd":   ("PRD",      cyan),
+    "prd-review": ("REVIEW-PRD", yellow),  # gate: human must read+approve the PRD
     "issues":   ("ISSUES",   cyan),    # to-issues
     "to-issues": ("ISSUES",  cyan),
     "tdd":      ("TDD",      green),

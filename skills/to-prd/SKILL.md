@@ -70,9 +70,45 @@ What this PRD intentionally does NOT cover.
 Anything else worth recording.
 ```
 
-## After saving
+## After saving — the PRD review gate
 
-Tell the user the PRD path in one line:
-> "PRD saved to `docs/prd/<slug>.md`. Ready to break it into issues?"
+The PRD is the contract. Every downstream issue and every line of TDD code inherits its errors. A PRD nobody read is the single most expensive failure in the workflow. So this is a **hard checkpoint**, not a "ready?" question.
 
-Do NOT run `to-issues` yourself — the orchestrator handles the transition.
+### 1. Move to the review stage
+
+```bash
+python3 ~/.claude/valkyrie/stage.py set prd-review
+```
+
+The statusline now shows **▶ REVIEW-PRD** — the signal that the human owes the PRD a read before anything proceeds.
+
+### 2. Surface the decisions inline — do NOT just print the path
+
+The user should not have to open a file to review. Reproduce these sections from the PRD you just wrote, verbatim, in the conversation:
+
+- **Implementation Decisions** (every bullet)
+- **Out of Scope** (every bullet)
+- **User Stories** (the 3–5 most consequential — not all of them if the list is long)
+
+Then state the path: "Full PRD: `docs/prd/<slug>.md`."
+
+### 3. Demand substantive approval
+
+Ask the user to do ONE of:
+
+- **Approve** by confirming at least one specific decision back to you in their own words (e.g. "yes, event-sourced orders and the Postgres write model are right"), OR
+- **Redline** — name a decision to change, and what to.
+
+**A bare "yes", "looks good", "lgtm", "sure", "proceed", or silence is NOT approval.** If you get one, respond:
+
+> "That's not engagement with the PRD — and an unreviewed PRD is exactly what Valkyrie exists to prevent. Tell me one decision in the Implementation Decisions or Out of Scope list that you agree with or want changed, in your own words. Then we proceed."
+
+Do not advance until the user has either confirmed a specific decision or requested a specific change. If they redline, revise the PRD, re-save, and re-run this gate from step 2.
+
+### 4. Hand back to the orchestrator
+
+Once the user has substantively approved, say:
+
+> "PRD approved: `<slug>`. Handing back to /valk for issue breakdown."
+
+Do NOT run `to-issues` yourself and do NOT set the `issues` stage — the orchestrator owns that transition and will verify the approval happened in this conversation before it proceeds.

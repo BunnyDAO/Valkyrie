@@ -31,7 +31,20 @@ Two diagrams. The **interactive workflow** describes a single slice from prompt 
 │   • problem · solution · user stories · impl · out-of-scope          │
 │   • output → docs/prd/<slug>.md                                      │
 └─────────────────────────┬───────────────────────────────────────────┘
-                          │  stage.py set issues
+                          │  stage.py set prd-review  (to-prd does this)
+                          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ GATE ── PRD-REVIEW  ▶ REVIEW-PRD                                     │
+│  (inside /to-prd — workflow STOPS here)                              │
+│   • decisions reproduced INLINE (Impl Decisions, Out of Scope,       │
+│     key User Stories) — no need to open the file                     │
+│   • user must confirm a specific decision in their own words         │
+│     OR redline one                                                   │
+│   • bare "yes"/"lgtm"/silence → REJECTED, gate re-asks               │
+│   • redline → revise PRD, re-run gate                                │
+│   • only substantive approval advances                               │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │  stage.py set issues  (ONLY after approval)
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ STAGE 3 ── ISSUES  ▶ ISSUES                                          │
@@ -195,7 +208,10 @@ flowchart TD
     S1 -.writes.-> Ctx[CONTEXT.md<br/>docs/adr/*]
     S1 --> S2["▶ PRD<br/>/to-prd"]
     S2 --> PRD[docs/prd/&lt;slug&gt;.md]
-    PRD --> S3["▶ ISSUES<br/>/to-issues"]
+    PRD --> GATE{"▶ REVIEW-PRD<br/>decisions shown inline<br/>substantive approval?"}
+    GATE -->|bare yes / silence| GATE
+    GATE -->|redline| S2
+    GATE -->|approves a specific decision| S3["▶ ISSUES<br/>/to-issues"]
     S3 --> Iss[issues/000N-*.md<br/>+ work_item_id<br/>+ blocked_by]
     Iss --> S4["▶ TDD<br/>/tdd"]
 

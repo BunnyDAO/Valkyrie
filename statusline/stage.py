@@ -23,7 +23,7 @@ from pathlib import Path
 
 VALID_STAGES = {
     "idle", "design", "grill-with-docs", "prd", "to-prd",
-    "issues", "to-issues", "tdd", "zoom", "zoom-out",
+    "prd-review", "issues", "to-issues", "tdd", "zoom", "zoom-out",
     "refactor", "afk",
 }
 

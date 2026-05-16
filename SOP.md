@@ -148,6 +148,7 @@ If you need the hook off for a session, comment out the `hooks` block in `~/.cla
 |---|---|---|---|
 | **DESIGN** | `/grill-with-docs` | Answer the AI's questions about the plan. One question at a time. | Skip ahead. Outsource thinking. |
 | **PRD** | `/to-prd` | Read the PRD it generates. ~5 minutes. Edit anything wrong. | Treat the PRD as a formality. |
+| **PRD-REVIEW** | (gate in `/to-prd`) | Engage with the decisions it shows you inline. Confirm one in your own words, or redline one. | Reply "yes"/"lgtm" — the gate rejects it and won't proceed. |
 | **ISSUES** | `/to-issues` | Confirm the vertical-slice breakdown. Adjust dependencies. | Accept thick slices that touch one layer only. |
 | **TDD** | `/tdd` | Watch the red-green-refactor loop. Catch test smells. | Let it write all tests upfront — that's horizontal slicing. |
 
@@ -171,7 +172,9 @@ The AI asks questions one at a time, with its recommended answer. Read each one.
 
 ### Step 3 — Read the PRD
 
-Stage flips to **▶ PRD**. The AI saves a PRD to `docs/prd/<slug>.md`. **Open it. Read it once.** Edit anything wrong. This is your last chance to catch architectural drift cheaply.
+Stage flips to **▶ PRD**. The AI saves a PRD to `docs/prd/<slug>.md`, then the statusline flips to **▶ REVIEW-PRD** and the AI **stops**. It reproduces the Implementation Decisions, Out of Scope, and key User Stories *inline in the conversation* — you don't have to go open the file (though the path is there if you want the full thing). This is your last chance to catch architectural drift cheaply, and the workflow will not move past it on autopilot.
+
+To proceed you must **engage**: confirm a specific decision back in your own words ("yes — event-sourced orders, Postgres write model"), or name one to change. A bare "yes", "looks good", "lgtm", or silence is **rejected** — the gate tells you that's not engagement and asks again. If you redline, the AI revises the PRD and re-runs the gate. Only a substantive approval advances the workflow to ISSUES. This is the gate the whole tool exists for: an unread PRD poisons every issue and every line of code downstream.
 
 ### Step 4 — Approve issues
 

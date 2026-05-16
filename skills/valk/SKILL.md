@@ -11,6 +11,7 @@ The stages, in order:
 
 1. **DESIGN** — `grill-with-docs` skill. Stress-test the idea by interviewing the user.
 2. **PRD** — `to-prd` skill. Synthesize the design into a PRD document.
+   - **PRD-REVIEW** — a hard gate inside the PRD stage. `to-prd` surfaces the decisions inline and the human must substantively approve before anything proceeds. This is the highest-leverage checkpoint in the workflow: a wrong PRD poisons every downstream issue and every line of code. Statusline shows ▶ REVIEW-PRD.
 3. **ISSUES** — `to-issues` skill. Break the PRD into independently-grabbable vertical slices.
 4. **TDD** — `tdd` skill. Implement each issue red-green-refactor.
 
@@ -27,10 +28,10 @@ The stages, in order:
 
 ### Hard rules — refuse politely if violated
 
-- **Never write production code** while stage is `idle`, `design`, `prd`, or `issues`. If the user asks you to "just implement it" while stage ≠ `tdd`, respond:
+- **Never write production code** while stage is `idle`, `design`, `prd`, `prd-review`, or `issues`. If the user asks you to "just implement it" while stage ≠ `tdd`, respond:
   > "Valkyrie is enforcing the workflow. We're currently at [STAGE]. The next step is [NEXT]. Want me to run that now?"
 - **Never start `to-prd`** if `grill-with-docs` hasn't happened in this conversation. The PRD is meant to *summarize* a grilling session — without one, the PRD is hallucinated.
-- **Never start `to-issues`** without a written PRD. If no PRD exists in the conversation, run `to-prd` first.
+- **Never start `to-issues`** until the PRD has been substantively approved **in this conversation**. "A PRD file exists" is NOT sufficient — the human must have engaged with its decisions during the `prd-review` gate (confirmed a specific decision in their own words, or redlined one). A bare "yes"/"looks good"/silence does not count and `to-prd` is instructed to reject it. If you reach the ISSUES decision point and cannot point to an explicit in-conversation approval, return to `prd-review` and run the gate — do not proceed on the existence of the file alone. This is the workflow's reason to exist; enforce it the hardest.
 - **Never start `tdd`** unless there is at least one issue defined (in the conversation, in `issues/`, or on a tracker).
 - The user **can** override with an explicit `--skip-to <stage>` argument or by saying "skip to <stage>". Honor overrides, but write a one-line warning explaining what was skipped.
 
@@ -41,7 +42,9 @@ When you move to a new stage, write the marker BEFORE invoking the sub-skill:
 ```bash
 python3 ~/.claude/valkyrie/stage.py set design     # before grill-with-docs
 python3 ~/.claude/valkyrie/stage.py set prd        # before to-prd
-python3 ~/.claude/valkyrie/stage.py set issues     # before to-issues
+# (to-prd itself sets `prd-review` and runs the approval gate — you do NOT
+#  set `issues` until it reports the user substantively approved)
+python3 ~/.claude/valkyrie/stage.py set issues     # before to-issues — ONLY after PRD approval
 python3 ~/.claude/valkyrie/stage.py set tdd        # before tdd
 python3 ~/.claude/valkyrie/stage.py clear          # when done
 ```
@@ -68,7 +71,9 @@ YOU: "Starting Valkyrie at DESIGN. I'll grill you on the plan first."
      [invoke grill-with-docs skill — interview until shared understanding]
      [stage.py set prd]
      [invoke to-prd skill — synthesize the PRD]
-     [stage.py set issues]
+       └─ to-prd sets `prd-review`, surfaces decisions inline,
+          and BLOCKS until the user substantively approves or redlines
+     [only after explicit approval: stage.py set issues]
      [invoke to-issues skill — break into vertical slices]
      [stage.py set tdd]
      [invoke tdd skill — implement red-green-refactor, one slice at a time]
