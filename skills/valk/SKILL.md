@@ -49,7 +49,43 @@ python3 ~/.claude/valkyrie/stage.py set tdd        # before tdd
 python3 ~/.claude/valkyrie/stage.py clear          # when done
 ```
 
-Then immediately invoke the corresponding skill (read its SKILL.md if not already loaded). Do not narrate the stage write to the user — keep it silent; the statusline shows them.
+Then **apply the Crew shim (below)** to decide what actually runs this stage, and do not narrate the stage write to the user — keep it silent; the statusline shows them.
+
+### Crew shim (optional — driven by `.claude/valk-config.md`)
+
+This is the **single, central** place crews plug in. The four stage sub-skills
+(`grill-with-docs`, `to-prd`, `to-issues`, `tdd`) are **untouched — do not edit
+the stage sub-skills**; all crew logic lives here.
+
+Before invoking a stage's sub-skill, make the decision **deterministically** —
+do not eyeball `<repo>/.claude/valk-config.md` yourself. Run the helper:
+
+```bash
+crew-shim decide <repo-root> <STAGE>
+```
+
+It prints exactly `vanilla` or `crew <id> <id> …`, applying the
+`<repo>/.claude/valk-config.md` contract (produced by Agent-Builder's Forge):
+
+- **`vanilla` — no file, OR not `version: 1`, OR an empty/absent agent list for
+  the current stage → run the vanilla sub-skill verbatim.** Behaviour is
+  byte-identical to having no shim at all. The default and common case (proven
+  by the no-op test, `test/test-noop.sh`).
+- **`crew <ids>` — `version: 1` AND a non-empty list for the current stage →
+  dispatch exactly those bound agents for this stage instead of the stock
+  sub-skill.** Each id maps to `<repo>/.claude/agents/<id>.md`.
+  Run them over the scoped blackboard via the bundled `crew-task` (mint a task,
+  thread its dir into each agent's brief). `support` agents are available to
+  any stage.
+
+The shim only replaces a stage's **work**, never the **enforcement**: stage
+order and the `prd-review` gate stay enforced exactly as above; a gating agent
+(e.g. reviewer/security) writing `status: blocked` halts that line of work.
+
+At **TDD**, crew mode runs **per issue**: for each unblocked issue, mint a task
+`tdd-<issue-id>` and dispatch the bound crew (e.g. implementer → tester-qa →
+reviewer-gate) scoped to that task's blackboard; the issue is `done` only if
+its gate passes.
 
 ### Triggers that should drop into Valkyrie automatically
 
