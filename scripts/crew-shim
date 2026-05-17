@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#
+# crew-shim — deterministic crew-vs-vanilla decision for the valk orchestrator.
+# The orchestrator runs this instead of eyeballing valk-config.md, so the
+# no-op guarantee is provable, not LLM-judged (Agent-Builder #0021 / ADR 0002).
+#
+#   crew-shim decide <repo-root> <STAGE>
+#
+# Prints exactly one line:
+#   vanilla              -> run the stock sub-skill verbatim (no behaviour change)
+#   crew <id> <id> ...   -> dispatch these bound agents for the stage
+#
+# vanilla when: no valk-config.md, OR it is not `version: 1`, OR the stage's
+# agent list is empty/absent. Anything else is a strict no-op.
+
+set -u
+
+cmd="${1:-}"
+repo="${2:-}"
+stage="${3:-}"
+
+if [ "$cmd" != "decide" ] || [ -z "$repo" ] || [ -z "$stage" ]; then
+  echo "usage: crew-shim decide <repo-root> <STAGE>" >&2
+  exit 2
+fi
+
+cfg="$repo/.claude/valk-config.md"
+[ -f "$cfg" ] || { echo "vanilla"; exit 0; }
+
+# Version gate — must explicitly declare `version: 1`.
+grep -qE '^version:[[:space:]]*1[[:space:]]*$' "$cfg" || { echo "vanilla"; exit 0; }
+
+STAGE="$(printf '%s' "$stage" | tr '[:lower:]' '[:upper:]')"
+
+line="$(grep -E "^[[:space:]]*${STAGE}:[[:space:]]*\[" "$cfg" | head -1)"
+[ -n "$line" ] || { echo "vanilla"; exit 0; }
+
+inside="$(printf '%s' "$line" | sed -E 's/^[^[]*\[//; s/\].*$//')"
+agents="$(printf '%s' "$inside" | tr ',' ' ' | xargs 2>/dev/null || true)"
+
+if [ -z "$agents" ]; then
+  echo "vanilla"
+else
+  echo "crew $agents"
+fi
+exit 0
