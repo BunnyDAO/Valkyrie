@@ -2,7 +2,7 @@
 id: 0014
 title: Self-silencing worktree-awareness nudge in the prompt guard
 type: AFK
-status: open
+status: done
 blocked_by: [0013]
 parent: docs/prd/concurrency-hardening.md
 ---
@@ -28,12 +28,12 @@ dir, not symlinked).
 
 ## Acceptance criteria
 
-- [ ] Invoked from the main checkout → output contains exactly one reminder
+- [x] Invoked from the main checkout → output contains exactly one reminder
       that references `valk-worktree`
-- [ ] Invoked inside a linked worktree → no reminder (silent)
-- [ ] Never blocks and never changes the guard's exit behaviour (warn-only)
-- [ ] No registry/pid/heartbeat/lockfile state introduced anywhere
-- [ ] Bash test in `test/` (run-tests.sh) covers main-tree→nudge,
+- [x] Invoked inside a linked worktree → no reminder (silent)
+- [x] Never blocks and never changes the guard's exit behaviour (warn-only)
+- [x] No registry/pid/heartbeat/lockfile state introduced anywhere
+- [x] Bash test in `test/` (run-tests.sh) covers main-tree→nudge,
       worktree→silent, exit unchanged; `test-noop.sh` single-flow path stays
       byte-green
 

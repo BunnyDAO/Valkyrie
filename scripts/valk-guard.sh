@@ -63,9 +63,25 @@ fi
 
 # Inject the enforcement context. Claude sees this as part of its system
 # context for this turn — it cannot be ignored the way a CLAUDE.md line can.
-jq -n '{
+CTX="VALK ENFORCEMENT: this prompt looks like a build/fix/refactor request and the Valkyrie stage is \`idle\`. You MUST invoke the \`valk\` skill via the Skill tool BEFORE writing any production code or proposing an implementation. The skill will route the work through DESIGN → PRD → ISSUES → TDD. If the user has clearly indicated this is a trivial one-line change, you may say so and bypass — but state the bypass out loud."
+
+# Self-silencing worktree-awareness nudge (issue 0014). Cheap, stateless git
+# check: a linked worktree's absolute git-dir always lives under
+# `<git-common-dir>/worktrees/<id>`; the main checkout's never does. If we are
+# in the shared MAIN checkout, append ONE reminder pointing at valk-worktree.
+# Inside a linked worktree (or not a git repo at all) it is silent — so it
+# self-extinguishes the moment each terminal isolates and never nags the
+# intended workflow. Warn-only: this only extends the context string; it adds
+# no state and does not change the exit path.
+GITDIR=$(git rev-parse --absolute-git-dir 2>/dev/null || true)
+case "$GITDIR" in
+  ""|*/worktrees/*) : ;;  # not a git repo, or already isolated → silent
+  *) CTX="$CTX"$'\n\n'"WORKTREE NUDGE: you are in the shared MAIN checkout. If another Valkyrie flow may run here concurrently, isolate this terminal first: run \`valk-worktree <name>\` and work in the linked worktree it prints. This reminder disappears automatically once you are in a worktree." ;;
+esac
+
+jq -n --arg ctx "$CTX" '{
   hookSpecificOutput: {
     hookEventName: "UserPromptSubmit",
-    additionalContext: "VALK ENFORCEMENT: this prompt looks like a build/fix/refactor request and the Valkyrie stage is `idle`. You MUST invoke the `valk` skill via the Skill tool BEFORE writing any production code or proposing an implementation. The skill will route the work through DESIGN → PRD → ISSUES → TDD. If the user has clearly indicated this is a trivial one-line change, you may say so and bypass — but state the bypass out loud."
+    additionalContext: $ctx
   }
 }'
