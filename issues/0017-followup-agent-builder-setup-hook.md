@@ -2,7 +2,7 @@
 id: 0017
 title: "FOLLOW-UP (cross-repo → Agent-Builder): ship a .valk-worktree-setup"
 type: AFK
-status: open
+status: done
 blocked_by: [0013]
 parent: docs/prd/concurrency-hardening.md
 ---
@@ -24,12 +24,20 @@ there (git-only) but the user does deps/port by hand.
 
 ## Acceptance criteria
 
-- [ ] An executable `.valk-worktree-setup` exists at the Agent-Builder repo
+- [x] An executable `.valk-worktree-setup` exists at the Agent-Builder repo
       root, conforming to Valkyrie's documented contract (#0013)
-- [ ] A new worktree created via `valk-worktree` comes up dependency-ready
+- [x] A new worktree created via `valk-worktree` comes up dependency-ready
       with a non-colliding dev port
-- [ ] Done in the Agent-Builder repo; committed there, not in Valkyrie
-- [ ] No change to Valkyrie required (confirms standalone independence)
+- [x] Done in the Agent-Builder repo; committed there, not in Valkyrie
+- [x] No change to Valkyrie required (confirms standalone independence)
+
+## Delivered
+
+Agent-Builder repo (BunnyDAO/BuildAICrew) commit `0799b38`:
+`.valk-worktree-setup` (mode 755) + `.env*.local` gitignore. Lockfile-exact
+`npm ci` + free dev port pinned in `.env.local`, idempotent. Verified port
+pick + idempotency in a scoped dry-run. No Valkyrie change — confirms the
+helper's standalone independence.
 
 ## Blocked by
 
