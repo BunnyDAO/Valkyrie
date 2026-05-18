@@ -2,7 +2,7 @@
 id: 0016
 title: Seed docs/adr/0001 — isolation, not locking
 type: AFK
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/concurrency-hardening.md
 ---
@@ -24,13 +24,13 @@ mitigation while isolation is the cure.
 
 ## Acceptance criteria
 
-- [ ] `docs/adr/0001-isolation-not-locking.md` exists in the standard ADR
+- [x] `docs/adr/0001-isolation-not-locking.md` exists in the standard ADR
       format (status, context, decision, consequences)
-- [ ] It states the registry-vs-helper trade-off and why locking/registry
+- [x] It states the registry-vs-helper trade-off and why locking/registry
       was explicitly rejected
-- [ ] It states the honest hard limit (no code fixes a shared tree) and the
+- [x] It states the honest hard limit (no code fixes a shared tree) and the
       mitigation-vs-cure framing
-- [ ] It establishes the `docs/adr/` log for the repo (first entry)
+- [x] It establishes the `docs/adr/` log for the repo (first entry)
 
 ## Blocked by
 
