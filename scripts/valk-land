@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# valk-land — land a finished valk/<name> branch onto the main branch
+# (issue 0019, tracer / local clean path). Run from the MAIN checkout:
+#
+#   fetch → rebase valk/<name> (in its linked worktree) onto fresh
+#   origin/main → fast-forward main → sync-safe push.
+#
+# Linear history; never force-pushes, never rewrites already-pushed history.
+# Companion to valk-worktree: valk-land <name> ↔ branch valk/<name> ↔
+# worktree ../<repo>-<name>. Language-agnostic and standalone.
+#
+set -u
+
+name="${1:-}"
+[ -n "$name" ] || { echo "usage: valk-land <name>" >&2; exit 2; }
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "valk-land: not inside a git repository" >&2; exit 1; }
+branch="valk/$name"
+
+git -C "$root" rev-parse --verify -q "refs/heads/$branch" >/dev/null || {
+  echo "valk-land: no branch $branch" >&2; exit 1; }
+
+# Must run from the main checkout (we fast-forward main here). Refusing from
+# inside the branch's own worktree mirrors valk-worktree --remove's stance.
+cur="$(git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+if [ "$cur" = "$branch" ]; then
+  echo "valk-land: run this from the main checkout, not from inside the $branch worktree" >&2
+  exit 2
+fi
+
+git -C "$root" fetch -q origin || { echo "valk-land: git fetch failed" >&2; exit 1; }
+
+# Locate the linked worktree that has valk/<name> checked out and rebase it
+# there — the branch is rebased where it lives, so this is worktree-safe and
+# never fights a "branch already checked out" error.
+wt="$(git -C "$root" worktree list --porcelain \
+      | awk -v b="branch refs/heads/$branch" '
+          /^worktree /{p=substr($0,10)} $0==b{print p; exit}')"
+[ -n "$wt" ] || {
+  echo "valk-land: $branch is not checked out in a worktree — create one with 'valk-worktree $name'" >&2
+  exit 1; }
+
+if ! git -C "$wt" rebase -q origin/main; then
+  git -C "$wt" rebase --abort >/dev/null 2>&1
+  echo "valk-land: rebase onto origin/main hit a conflict — resolve it in $wt, then re-run" >&2
+  exit 1
+fi
+
+# Fast-forward main from the main checkout (main is checked out at $root).
+# --ff-only can never create a merge commit or rewrite history.
+git -C "$root" checkout -q main || { echo "valk-land: cannot checkout main at $root" >&2; exit 1; }
+git -C "$root" merge --ff-only "$branch" || {
+  echo "valk-land: main is not fast-forwardable from $branch" >&2; exit 1; }
+
+git -C "$root" push -q origin main || { echo "valk-land: push failed" >&2; exit 1; }
+
+echo "✓ landed $branch onto origin/main"

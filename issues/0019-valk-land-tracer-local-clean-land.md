@@ -2,7 +2,7 @@
 id: 0019
 title: valk-land tracer — local clean land (rebase → ff → push)
 type: AFK
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/valk-land.md
 ---
@@ -27,16 +27,22 @@ full suite stays green.
 
 ## Acceptance criteria
 
-- [ ] `valk-land <name>` on a clean (no-conflict) `valk/<name>` lands it: it
+- [x] `valk-land <name>` on a clean (no-conflict) `valk/<name>` lands it: it
       is rebased onto current `origin/main`, local main fast-forwards, and
       `origin/main` is advanced to include the work
-- [ ] History is linear (no merge commit); no force-push, no rewrite of
+- [x] History is linear (no merge commit); no force-push, no rewrite of
       already-pushed history
-- [ ] A bash test in `test/` (auto-discovered by `run-tests.sh`) proves it
+- [x] A bash test in `test/` (auto-discovered by `run-tests.sh`) proves it
       against a **simulated origin** (a bare clone), observing only git
       state / filesystem / exit code
-- [ ] `test-noop.sh` stays byte-green and the full suite stays green
+- [x] `test-noop.sh` stays byte-green and the full suite stays green
       (regression guard for the untouched single-flow / crew-shim path)
+
+> Done. Realistic topology folded in per user direction: `valk/<name>`
+> checked out in a linked worktree, rebased in place there; run from the
+> main checkout (refuses from inside the worktree); no-worktree topology is
+> an explicit unsupported error (a later slice can drive it). Suite 12/12,
+> `test-noop` byte-green.
 
 ## Blocked by
 
