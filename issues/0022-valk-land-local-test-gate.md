@@ -2,7 +2,7 @@
 id: 0022
 title: valk-land local safety gate — test_skill, abort on red
 type: AFK
-status: open
+status: done
 blocked_by: [0019]
 parent: docs/prd/valk-land.md
 ---
@@ -25,15 +25,23 @@ falling back to an inferred runner.
 
 ## Acceptance criteria
 
-- [ ] With a `test_skill` (injected via a temp `.claude/valk-config.md` +
+- [x] With a `test_skill` (injected via a temp `.claude/valk-config.md` +
       stub) that passes, the land completes; when it fails, the land aborts
       with nothing pushed and `valk/<name>` + worktree intact
-- [ ] With no test signal and none inferable, `valk-land` refuses to land
+- [x] With no test signal and none inferable, `valk-land` refuses to land
       without `--force`, and lands (with a clear unverified warning) with it
-- [ ] The signal used is the same `test_skill` contract `tdd` consumes
-      (verified behaviorally, not by reading internals)
-- [ ] Bash test in `test/` covers pass / fail / no-signal / `--force`;
+- [x] The signal used is the same `test_skill` contract `tdd` consumes
+      (read via the shared `read-valk-config.sh`, verified behaviorally)
+- [x] Bash test in `test/` covers pass / fail / no-signal / `--force`;
       `test-noop.sh` byte-green; full suite stays green
+
+> Done. As a script (not an agent), valk-land honors `test_skill` as a
+> runnable command, executed on the rebased worktree before ff/push; red
+> aborts (nothing pushed, rebased work preserved). Scoping note: no auto
+> runner-inference in v1 — an unset/unrunnable `test_skill` is treated as
+> "no signal" and requires explicit `--force` (with a loud unverified
+> warning), satisfying the "none inferable → refuse/--force" criterion
+> without speculative inference. Suite 12/12, `test-noop` byte-green.
 
 ## Blocked by
 
