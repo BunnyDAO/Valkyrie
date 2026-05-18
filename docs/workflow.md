@@ -183,6 +183,54 @@ afk N --max-hours H --max-cost-usd USD --cli claude|codex
 └────────────────────────────────────────────────────────────────┘
 ```
 
+## Parallel flows — multiple terminals on one project
+
+Running several Valkyrie flows at once on one project is **supported — via
+one git worktree per flow, not by sharing one checkout.**
+
+**Why a shared checkout can't be made safe by code.** Two flows in the same
+working tree share one index, one `HEAD`, one set of files. One flow's `git
+add`→`git commit` window gets scooped by another's broad commit; a
+half-written file reddens the other's test run; the stage marker is
+clobbered. No amount of Valkyrie code removes that residue — same-file races
+and shared red runs are *irreducible* without isolation. The cure is to stop
+sharing the tree. (Rationale recorded in
+[`docs/adr/0001-isolation-not-locking.md`](./adr/0001-isolation-not-locking.md).)
+
+### The supported parallel lifecycle
+
+```
+create     valk-worktree <name>     # ../<repo>-<name> on branch valk/<name>
+                                     # runs optional .valk-worktree-setup
+work       cd ../<repo>-<name>      # this terminal is now isolated
+                                     # run /valk … /tdd here as normal
+integrate  merge or PR  valk/<name> → main branch   (MANUAL — see below)
+cleanup    valk-worktree --remove <name>            # drops the merged branch
+```
+
+- **One worktree per terminal/flow.** Each flow gets its own
+  `valk/<name>` branch and its own checkout; concurrent flows can no longer
+  corrupt each other.
+- **Integrate-back is manual for now.** When a flow's slice is done, land
+  its `valk/<name>` branch on the main branch yourself via merge or PR —
+  the same review you'd do for any branch. Automating this (a `valk-land`
+  companion: auto-rebase vs PR, CI gating, conflict policy) is a **separate,
+  deliberately deferred PRD** — tracked as issue #0018, not built yet and
+  not implied to exist. Until it is designed, this manual merge/PR path is
+  the supported integrate-back.
+- **Cleanup.** `valk-worktree --remove <name>` removes the worktree and
+  drops the `valk/<name>` branch *only if it is merged* (an unmerged branch
+  is kept so no work is lost).
+- **The guard will remind you.** If you start working in the shared main
+  checkout, the UserPromptSubmit guard appends one nudge pointing at
+  `valk-worktree`. It goes **silent automatically** once you are inside a
+  linked worktree — it never nags the isolated (intended) workflow.
+
+The optional `.valk-worktree-setup` hook (deps install, free-port pick, …)
+is per-repo and language-agnostic; full contract +
+sample: [`valk-worktree-setup-format.md`](./valk-worktree-setup-format.md).
+`valk-worktree` works fully without it (pure git is the cure).
+
 ## Config gates at a glance
 
 | Gate | Where it reads | Behavior when set | Behavior when unset |

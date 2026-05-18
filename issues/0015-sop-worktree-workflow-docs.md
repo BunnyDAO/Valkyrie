@@ -2,7 +2,7 @@
 id: 0015
 title: Document worktree-per-flow as the supported parallel mode
 type: AFK
-status: open
+status: done
 blocked_by: [0013]
 parent: docs/prd/concurrency-hardening.md
 ---
@@ -30,12 +30,12 @@ Docs only — no behavior change.
 
 ## Acceptance criteria
 
-- [ ] SOP + workflow docs describe worktree-per-flow as the supported
+- [x] SOP + workflow docs describe worktree-per-flow as the supported
       parallel mode, with the create / integrate-back / remove lifecycle
-- [ ] The "why a shared tree can't be code-fixed" framing is stated plainly
-- [ ] Manual merge/PR integrate-back documented; `valk-land` referenced as a
+- [x] The "why a shared tree can't be code-fixed" framing is stated plainly
+- [x] Manual merge/PR integrate-back documented; `valk-land` referenced as a
       tracked future PRD (#0018), not implied to exist now
-- [ ] No code/behavior change; existing tests stay green
+- [x] No code/behavior change; existing tests stay green
 
 ## Blocked by
 

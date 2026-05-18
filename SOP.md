@@ -472,6 +472,43 @@ afk 5
 
 ---
 
+## Running multiple flows in parallel (worktree-per-flow)
+
+Want three terminals chewing through issues at once on the same project?
+**Supported — but give each flow its own git worktree, never share one
+checkout.**
+
+A shared checkout cannot be made safe by Valkyrie code: two flows share one
+index, one `HEAD`, one set of files, so commits get cross-swept, half-written
+files redden the other's test run, and the stage marker is clobbered. That
+residue is irreducible without isolation. So isolate:
+
+```bash
+valk-worktree feature-a        # creates ../<repo>-feature-a on valk/feature-a
+cd ../<repo>-feature-a         # this terminal is now isolated — run /valk here
+# … flow runs to done on its own valk/feature-a branch …
+git switch main && git merge valk/feature-a   # integrate-back (manual; or open a PR)
+valk-worktree --remove feature-a              # cleanup (drops the merged branch)
+```
+
+- **One `valk-worktree <name>` per terminal.** Each flow works on its own
+  `valk/<name>` branch in its own checkout. Concurrency stops being a hazard.
+- **Integrate-back is manual:** merge or PR each `valk/<name>` branch to the
+  main branch, with the review you'd give any branch. A `valk-land` helper to
+  automate this is a **deferred, separately-designed PRD** (tracked, not built
+  — see issue #0018); until then this manual path is the supported one.
+- **Cleanup:** `valk-worktree --remove <name>` removes the worktree and drops
+  the branch *only if merged* (unmerged branches are kept — no lost work).
+- The prompt guard nudges you toward `valk-worktree` if you're still in the
+  shared checkout, and **goes silent on its own** once you're in a worktree —
+  it never nags the isolated workflow.
+
+`valk-worktree` is pure git and works with no setup hook. Repos that want a
+freshly-created worktree to come up build-ready (deps installed, free port
+chosen) can drop an optional `.valk-worktree-setup` — see the workflow doc.
+
+---
+
 ## 10. FAQ
 
 **Q: Do I have to use this for every prompt?**
