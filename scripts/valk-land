@@ -73,6 +73,19 @@ fi
 
 git -C "$root" fetch -q origin || { echo "valk-land: git fetch failed" >&2; exit 1; }
 
+# Resolve the repo's default branch — its "base". Never assume it is named
+# `main`: origin/HEAD (set at clone) names the remote's default; strip the
+# refs/remotes/origin/ prefix. (An explicit --base override and a richer hint
+# when this cannot be resolved are issue 0029.)
+base="$(git -C "$root" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)"
+base="${base#refs/remotes/origin/}"
+# Never guess (ADR-0002/0003): if the default branch can't be determined,
+# abort before touching anything and tell the user the one-line remedy.
+if [ -z "$base" ] || ! git -C "$root" rev-parse --verify -q "origin/$base" >/dev/null; then
+  echo "valk-land: cannot determine the repo's default branch — refs/remotes/origin/HEAD is unset. Run 'git -C \"$root\" remote set-head origin -a' to set it, then re-run 'valk-land $name'." >&2
+  exit 1
+fi
+
 # Locate the linked worktree that has valk/<name> checked out and rebase it
 # there — the branch is rebased where it lives, so this is worktree-safe and
 # never fights a "branch already checked out" error.
@@ -83,16 +96,16 @@ wt="$(git -C "$root" worktree list --porcelain \
   echo "valk-land: $branch is not checked out in a worktree — create one with 'valk-worktree $name'" >&2
   exit 1; }
 
-if ! git -C "$wt" rebase -q origin/main; then
+if ! git -C "$wt" rebase -q "origin/$base"; then
   git -C "$wt" rebase --abort >/dev/null 2>&1
   {
-    echo "valk-land: rebase of $branch onto origin/main hit a conflict."
+    echo "valk-land: rebase of $branch onto origin/$base hit a conflict."
     echo "Nothing was changed — $branch and its worktree are exactly as before,"
-    echo "origin/main is untouched. valk-land does not auto-resolve. Resolve it"
+    echo "origin/$base is untouched. valk-land does not auto-resolve. Resolve it"
     echo "by hand in the worktree, then re-run:"
     echo
     echo "  cd $wt"
-    echo "  git rebase origin/main      # redo the rebase, fix the conflicts"
+    echo "  git rebase origin/$base      # redo the rebase, fix the conflicts"
     echo "  # …edit files, git add, git rebase --continue (or --abort to back out)"
     echo "  valk-land $name             # re-run once the rebase is clean"
   } >&2
@@ -120,29 +133,29 @@ fi
 
 # Remember pre-land main so a refused push can be fully unwound (the local
 # ff was never published, and valk/<name> keeps the rebased work).
-pre_main="$(git -C "$root" rev-parse --verify -q main)" || {
-  echo "valk-land: cannot resolve main at $root" >&2; exit 1; }
+pre_base="$(git -C "$root" rev-parse --verify -q "$base")" || {
+  echo "valk-land: cannot resolve $base at $root" >&2; exit 1; }
 
-# Fast-forward main from the main checkout (main is checked out at $root).
+# Fast-forward the base from the main checkout (it is checked out at $root).
 # --ff-only can never create a merge commit or rewrite history.
-git -C "$root" checkout -q main || { echo "valk-land: cannot checkout main at $root" >&2; exit 1; }
+git -C "$root" checkout -q "$base" || { echo "valk-land: cannot checkout $base at $root" >&2; exit 1; }
 git -C "$root" merge --ff-only "$branch" || {
-  echo "valk-land: main is not fast-forwardable from $branch" >&2; exit 1; }
+  echo "valk-land: $base is not fast-forwardable from $branch" >&2; exit 1; }
 
 if [ "$no_push" -eq 1 ]; then
-  echo "✓ $branch landed on local main (--no-push: origin untouched)"
+  echo "✓ $branch landed on local $base (--no-push: origin untouched)"
   exit 0
 fi
 
-if ! git -C "$root" push -q origin main; then
+if ! git -C "$root" push -q origin "$base"; then
   # origin moved under us (a concurrent flow landed). Never force. Unwind
   # the unpublished local ff; valk/<name> keeps the rebased work.
-  git -C "$root" reset --hard -q "$pre_main"
-  echo "valk-land: origin/main moved (a concurrent land won). Nothing was force-pushed; your work is safe on $branch. Re-run 'valk-land $name' to rebase on the new origin/main and try again." >&2
+  git -C "$root" reset --hard -q "$pre_base"
+  echo "valk-land: origin/$base moved (a concurrent land won). Nothing was force-pushed; your work is safe on $branch. Re-run 'valk-land $name' to rebase on the new origin/$base and try again." >&2
   exit 1
 fi
 
-echo "✓ landed $branch onto origin/main"
+echo "✓ landed $branch onto origin/$base"
 
 # Cleanup coupling — opt-in, never by surprise. Only after a real push.
 if [ "$clean" -eq 1 ]; then

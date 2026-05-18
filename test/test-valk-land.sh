@@ -21,12 +21,13 @@ gitc() { git -C "$1" -c user.email=t@t.t -c user.name=t "${@:2}"; }
 # F_ORIGIN.
 mkfixture() {
   local d="$WORK/$1"
+  local def="${2:-main}"            # default branch name (issue 0028)
   local seed="$d/seed" origin="$d/origin.git" main="$d/proj"
   local wt="$d/proj-feat" other="$d/other"
   mkdir -p "$seed"
   gitc "$seed" init -q
   echo base > "$seed/file.txt"; gitc "$seed" add -A; gitc "$seed" commit -qm base
-  gitc "$seed" branch -M main
+  gitc "$seed" branch -M "$def"
   git clone -q --bare "$seed" "$origin"
   git clone -q "$origin" "$main"
   gitc "$main" branch valk/feat
@@ -36,7 +37,7 @@ mkfixture() {
   git clone -q "$origin" "$other"
   echo other > "$other/other.txt"
   gitc "$other" add -A; gitc "$other" commit -qm "other: concurrent work"
-  gitc "$other" push -q origin main
+  gitc "$other" push -q origin "$def"
   F_MAIN="$main"; F_WT="$wt"; F_ORIGIN="$origin"
 }
 
@@ -260,5 +261,46 @@ HOME="$SBX" bash "$REPO/install.sh" >/dev/null 2>&1 \
 [ -L "$SBX/.local/bin/afk" ] \
   || fail "0025: regression — afk no longer PATH-registered"
 echo "ok: 0025 installer PATH-registers valk-land (afk + valk-worktree intact)"
+
+# --- 0028a: a master-default repo lands (default branch resolved, not assumed) ---
+mkfixture s28a master
+( cd "$F_MAIN" && "$VL" feat --force ) || fail "0028a: valk-land on a master-default repo exited non-zero"
+gitc "$F_MAIN" fetch -q origin
+L="$(gitc "$F_MAIN" log --format=%s origin/master)"
+printf '%s\n' "$L" | grep -q "feat: add feature"     || fail "0028a: origin/master missing feature commit"
+printf '%s\n' "$L" | grep -q "other: concurrent work" || fail "0028a: origin/master lost concurrent commit"
+[ -z "$(gitc "$F_MAIN" log --merges --format=%H origin/master)" ] || fail "0028a: history not linear"
+[ "$(gitc "$F_MAIN" rev-parse master)" = "$(gitc "$F_MAIN" rev-parse origin/master)" ] \
+  || fail "0028a: local master not fast-forwarded to origin/master"
+echo "ok: 0028 — master-default repo lands (resolved default branch, linear, ff, pushed)"
+
+# --- 0028b: origin/HEAD genuinely unresolvable (bad remote HEAD; git fetch
+#     cannot derive it) → abort + set-head hint, nothing touched. Inlined
+#     because mkfixture presumes a valid default branch. ---
+d28="$WORK/s28b"; s="$d28/seed"; og="$d28/origin.git"; mn="$d28/proj"; w="$d28/proj-feat"
+mkdir -p "$s"
+gitc "$s" init -q
+echo base > "$s/file.txt"; gitc "$s" add -A; gitc "$s" commit -qm base
+gitc "$s" branch -M master
+git clone -q --bare "$s" "$og"
+git -C "$og" symbolic-ref HEAD refs/heads/nonexistent   # remote HEAD invalid → origin/HEAD unresolvable
+git clone -q "$og" "$mn" 2>/dev/null
+gitc "$mn" fetch -q origin
+gitc "$mn" branch master origin/master
+gitc "$mn" checkout -q master
+gitc "$mn" branch valk/feat
+gitc "$mn" worktree add -q "$w" valk/feat
+echo feature > "$w/feature.txt"; gitc "$w" add -A; gitc "$w" commit -qm "feat: add feature"
+o_before="$(git -C "$og" rev-parse master)"
+m_before="$(gitc "$mn" rev-parse master)"
+b_before="$(gitc "$w" rev-parse valk/feat)"
+out="$( cd "$mn" && "$VL" feat --force 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0028b: unresolvable origin/HEAD must exit non-zero (got: $out)"
+[ "$(git -C "$og" rev-parse master)" = "$o_before" ] || fail "0028b: origin must be untouched"
+[ "$(gitc "$mn" rev-parse master)" = "$m_before" ] || fail "0028b: local must be untouched"
+[ "$(gitc "$w" rev-parse valk/feat)" = "$b_before" ] || fail "0028b: valk/feat must be preserved"
+printf '%s' "$out" | grep -q 'set-head' \
+  || fail "0028b: hint must name 'git remote set-head origin -a' (got: $out)"
+echo "ok: 0028 unresolvable origin/HEAD — abort, preserve, set-head hint"
 
 exit 0
