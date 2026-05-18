@@ -12,8 +12,17 @@
 #
 set -u
 
-name="${1:-}"
-[ -n "$name" ] || { echo "usage: valk-land <name>" >&2; exit 2; }
+name=""
+no_push=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-push) no_push=1 ;;
+    -*) echo "valk-land: unknown option: $arg" >&2; exit 2 ;;
+    *) [ -n "$name" ] && { echo "valk-land: unexpected argument: $arg" >&2; exit 2; }
+       name="$arg" ;;
+  esac
+done
+[ -n "$name" ] || { echo "usage: valk-land <name> [--no-push]" >&2; exit 2; }
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "valk-land: not inside a git repository" >&2; exit 1; }
@@ -48,12 +57,28 @@ if ! git -C "$wt" rebase -q origin/main; then
   exit 1
 fi
 
+# Remember pre-land main so a refused push can be fully unwound (the local
+# ff was never published, and valk/<name> keeps the rebased work).
+pre_main="$(git -C "$root" rev-parse --verify -q main)" || {
+  echo "valk-land: cannot resolve main at $root" >&2; exit 1; }
+
 # Fast-forward main from the main checkout (main is checked out at $root).
 # --ff-only can never create a merge commit or rewrite history.
 git -C "$root" checkout -q main || { echo "valk-land: cannot checkout main at $root" >&2; exit 1; }
 git -C "$root" merge --ff-only "$branch" || {
   echo "valk-land: main is not fast-forwardable from $branch" >&2; exit 1; }
 
-git -C "$root" push -q origin main || { echo "valk-land: push failed" >&2; exit 1; }
+if [ "$no_push" -eq 1 ]; then
+  echo "✓ $branch landed on local main (--no-push: origin untouched)"
+  exit 0
+fi
+
+if ! git -C "$root" push -q origin main; then
+  # origin moved under us (a concurrent flow landed). Never force. Unwind
+  # the unpublished local ff; valk/<name> keeps the rebased work.
+  git -C "$root" reset --hard -q "$pre_main"
+  echo "valk-land: origin/main moved (a concurrent land won). Nothing was force-pushed; your work is safe on $branch. Re-run 'valk-land $name' to rebase on the new origin/main and try again." >&2
+  exit 1
+fi
 
 echo "✓ landed $branch onto origin/main"
