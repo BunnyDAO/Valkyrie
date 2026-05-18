@@ -96,6 +96,23 @@ afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with a larger budge
 
 The loop picks the next unblocked issue, spawns the CLI with a fresh context, and lets it implement the slice. **Whichever cap is hit first wins** — iterations, hours, or dollars. The statusline shows **▶ AFK**. Logs land in `.claude/valk/afk-logs/`, and a per-iteration row (including `cost_source`) is appended to `.claude/valk/afk-cost-history.csv`.
 
+### Running flows in parallel
+
+Multiple Valkyrie flows on one project? Don't share a checkout — give each
+its own git worktree, or they corrupt each other (commit sweeps, false-red
+runs). One command each way:
+
+```bash
+valk-worktree <name>      # isolate this terminal in ../<repo>-<name> on valk/<name>
+# … run /valk … /tdd in that worktree …
+valk-land <name>          # integrate-back: delegates to pr_skill, else rebase+test-gate+ff+push
+valk-worktree --remove <name>   # cleanup (or `valk-land --clean`)
+```
+
+Full how-to (lifecycle, the test gate, conflict handling, the
+`.valk-worktree-setup` hook): **SOP.md → "Running multiple flows in
+parallel"** and `docs/workflow.md`.
+
 ### Per-project config (opt-in PR workflow)
 
 Repos can opt into a "the deliverable is a PR" workflow by adding `<repo>/.claude/valk-config.md`. With this file, `/tdd` and `afk` change what "done" means: instead of flipping a frontmatter field, the slice is only marked done after a pull request is opened and its CI build passes green.
