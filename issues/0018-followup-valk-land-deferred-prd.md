@@ -2,10 +2,15 @@
 id: 0018
 title: "FOLLOW-UP (deferred): design valk-land (branch→master integration)"
 type: HITL
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/concurrency-hardening.md
 ---
+
+> **Discharged.** Picked up consciously and run through its own full
+> grill → PRD → prd-review (substantively approved) → issues. Design:
+> `docs/prd/valk-land.md`. Implementation slices: issues 0019–0027. This
+> placeholder is closed; the work now lives in those slices.
 
 ## What to build
 
@@ -29,10 +34,12 @@ the SOP (#0015) is the supported integrate-back.
 
 ## Acceptance criteria
 
-- [ ] Remains `open` as a tracked placeholder until consciously picked up
-- [ ] When picked up: runs its own grill → PRD → issues → tdd (not
-      implemented directly from this issue)
-- [ ] The SOP's manual integrate-back stays the documented path until then
+- [x] Held `open` as a tracked placeholder until consciously picked up
+- [x] When picked up: ran its own grill → PRD → prd-review → issues (NOT
+      implemented directly from this issue) → `docs/prd/valk-land.md`,
+      issues 0019–0027
+- [x] The SOP's manual integrate-back stays the documented path until the
+      `valk-land` docs slice (#0026) ships
 
 ## Blocked by
 
