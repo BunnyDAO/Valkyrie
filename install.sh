@@ -168,6 +168,17 @@ for name in afk ralph-afk; do
   echo "  + $name -> $REPO/scripts/afk"
 done
 
+# valk-worktree: one-command per-flow git-worktree isolation — the cure for
+# concurrent flows on one checkout. PATH-registered exactly like afk.
+chmod +x "$REPO/scripts/valk-worktree"
+target="$LOCAL_BIN/valk-worktree"
+if [ -e "$target" ] && [ ! -L "$target" ]; then
+  echo "  - existing non-symlink valk-worktree in $LOCAL_BIN — backing up to ${target}.bak"
+  mv "$target" "${target}.bak"
+fi
+ln -sfn "$REPO/scripts/valk-worktree" "$target"
+echo "  + valk-worktree -> $REPO/scripts/valk-worktree"
+
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
   echo "  NOTE: $LOCAL_BIN is not on your PATH. Add this to your shell rc:"

@@ -2,7 +2,7 @@
 id: 0013
 title: valk-worktree helper — create+remove lifecycle (the cure)
 type: AFK
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/concurrency-hardening.md
 ---
@@ -33,16 +33,16 @@ other. Standalone-valuable and language-agnostic.
 
 ## Acceptance criteria
 
-- [ ] `valk-worktree <name>` creates `../<repo>-<name>` on branch
+- [x] `valk-worktree <name>` creates `../<repo>-<name>` on branch
       `valk/<name>`; runs `.valk-worktree-setup` iff present+executable;
       prints next steps; idempotent / safe no-op if it already exists
-- [ ] `valk-worktree --remove <name>` removes the worktree and drops the
+- [x] `valk-worktree --remove <name>` removes the worktree and drops the
       `valk/<name>` branch when merged; safe/clear if it doesn't exist
-- [ ] Works with NO `.valk-worktree-setup` present (git-only path) — proves
+- [x] Works with NO `.valk-worktree-setup` present (git-only path) — proves
       standalone value; no npm/port logic baked into the helper
-- [ ] The `.valk-worktree-setup` contract is documented and a sample shipped
-- [ ] Installer PATH-registers the command; install test updated and green
-- [ ] Bash test in `test/` (temp git repo) covers: create, branch, hook-run,
+- [x] The `.valk-worktree-setup` contract is documented and a sample shipped
+- [x] Installer PATH-registers the command; install test updated and green
+- [x] Bash test in `test/` (temp git repo) covers: create, branch, hook-run,
       idempotency, `--remove` teardown, no-op safety — run via `run-tests.sh`
 
 ## Blocked by

@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+#
+# valk-worktree — isolate a Valkyrie flow in its own git worktree+branch
+# (issue 0013). Concurrent Valkyrie flows sharing ONE checkout corrupt each
+# other (commit sweeps, false-red shared runs); one worktree per terminal
+# makes them safe by construction. Language-agnostic and standalone — works
+# fully with no consumer hook present (pure git is the cure).
+#
+#   valk-worktree <name>            create ../<repo>-<name> on valk/<name>
+#   valk-worktree --remove <name>   tear it down + drop merged valk/<name>
+#
+set -u
+
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "valk-worktree: not inside a git repository" >&2; exit 1; }
+base="$(basename "$root")"
+
+# ---- remove mode -----------------------------------------------------------
+if [ "${1:-}" = "--remove" ]; then
+  name="${2:-}"
+  [ -n "$name" ] || { echo "usage: valk-worktree --remove <name>" >&2; exit 2; }
+  dest="$root/../$base-$name"
+  branch="valk/$name"
+
+  if [ ! -e "$dest" ]; then
+    echo "✓ no worktree '$name' (nothing to remove)"
+    exit 0
+  fi
+
+  # --force: a setup hook may have left untracked build artefacts; an
+  # explicit teardown means the user wants it gone regardless.
+  git -C "$root" worktree remove --force "$dest" 2>/dev/null \
+    || git -C "$root" worktree prune
+  # -d (not -D): drop the branch only if it's merged; an unmerged branch is
+  # kept so no work is silently lost.
+  if git -C "$root" branch -d "$branch" >/dev/null 2>&1; then :; else
+    echo "valk-worktree: kept branch $branch (unmerged — delete it by hand if intended)" >&2
+  fi
+  echo "✓ removed worktree '$name'"
+  exit 0
+fi
+
+# ---- create mode -----------------------------------------------------------
+name="${1:-}"
+[ -n "$name" ] || {
+  echo "usage: valk-worktree <name>  |  valk-worktree --remove <name>" >&2
+  exit 2; }
+dest="$root/../$base-$name"
+branch="valk/$name"
+
+if [ -e "$dest" ]; then
+  echo "✓ worktree already exists (no-op)"
+  echo "  cd $(cd "$dest" && pwd)   # you're isolated — work here"
+  exit 0
+fi
+
+git -C "$root" worktree add "$dest" -b "$branch" || exit 1
+
+# Optional per-repo setup, run from the NEW worktree root. Pure aid: absent
+# or non-executable ⇒ skipped (helper is standalone). A non-zero hook warns
+# but never unwinds the worktree (it already exists and is usable).
+if [ -x "$root/.valk-worktree-setup" ]; then
+  ( cd "$dest" && "$root/.valk-worktree-setup" ) \
+    || echo "valk-worktree: .valk-worktree-setup exited non-zero (worktree kept)" >&2
+fi
+
+abs="$(cd "$dest" && pwd)"
+echo "✓ isolated worktree ready"
+echo "  cd $abs   # you're isolated — work here"

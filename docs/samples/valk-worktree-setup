@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# .valk-worktree-setup — SAMPLE bootstrap hook for valk-worktree.
+#
+# Copy to your repo root as `.valk-worktree-setup`, `chmod +x` it (the +x is
+# what arms it), keep the block for your stack, delete the rest. Full contract:
+# docs/valk-worktree-setup-format.md.
+#
+# Guarantees you can rely on:
+#   - cwd is the NEW worktree's root (relative paths land in the isolated tree)
+#   - runs once, right after the worktree was created (never on --remove/no-op)
+#   - non-zero exit only WARNS; it never destroys the worktree
+#
+# This sample is intentionally a no-op until you uncomment a block — copying
+# it verbatim is safe.
+set -eu
+
+echo "valk-worktree-setup: isolating $(basename "$PWD")"
+
+# ── Node / npm ──────────────────────────────────────────────────────────────
+# if [ -f package-lock.json ]; then
+#   npm ci
+#   # Pick a free port and pin it for this worktree so parallel dev servers
+#   # don't collide:
+#   PORT="$(node -e 'const s=require("net").createServer();s.listen(0,()=>{console.log(s.address().port);s.close()})')"
+#   echo "PORT=$PORT" > .env.local
+#   echo "  → deps installed, dev port $PORT pinned in .env.local"
+# fi
+
+# ── Python ──────────────────────────────────────────────────────────────────
+# if [ -f requirements.txt ] || [ -f pyproject.toml ]; then
+#   python3 -m venv .venv
+#   . .venv/bin/activate
+#   [ -f requirements.txt ] && pip install -q -r requirements.txt
+#   [ -f pyproject.toml ]   && pip install -q -e .
+#   echo "  → .venv created and dependencies installed"
+# fi
+
+# ── Anything else ───────────────────────────────────────────────────────────
+# Seed config, generate certs, warm a cache — whatever a fresh checkout needs.
+# Write resources INTO this dir so `valk-worktree --remove` (which just deletes
+# the dir) is enough teardown.
+
+echo "valk-worktree-setup: done"
