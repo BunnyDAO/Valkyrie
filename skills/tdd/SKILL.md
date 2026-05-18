@@ -126,7 +126,38 @@ Only after tests are green. Look for:
 
 When all acceptance criteria are checked off:
 
-1. Commit with a message referencing the issue id (e.g. `feat: add billing dashboard (#0003)`)
+1. **Commit — concurrency-safe recipe (do exactly this).** Other Valkyrie
+   flows may share this working tree; a `git add` then a separate `git
+   commit` is a race window another flow's `git commit -a` will scoop. So:
+
+   - Stage only this slice's files by **explicit pathspec**, then commit
+     **scoped to those same pathspecs**:
+
+     ```bash
+     git add -- <file> [<file> …]
+     git commit -m "<type>: <summary> (#000N)" \
+                -m "Co-Authored-By: …" \
+                -- <file> [<file> …]
+     ```
+
+     The commit's `-- <pathspecs>` is the actual protection: it commits
+     **only** those paths regardless of what another flow staged in the
+     shared index. The `-m` flags **must come before** `--` (anything after
+     `--` is parsed as a pathspec). `git add` is still required for new
+     files — the pathspec on `commit`, not the absence of `add`, is what
+     makes it safe. **Never** `git add -A`, **never** `git commit -a`,
+     **never** a bare `git commit` with no pathspec.
+   - Push sync-safe: `git fetch`; if the remote moved, `git pull --rebase`;
+     then push.
+   - If the commit comes back **empty/failed**, assume a concurrent flow
+     already swept those paths into its own commit: `git fetch`, inspect
+     `git log` / `git ls-files`, verify the pushed tip still builds,
+     reconcile. Prefer the integrity-fix (make the pushed tip compile) over
+     rewriting already-pushed history; record the attribution wart in the
+     issue rather than force-pushing.
+
+   The message still references the issue id (e.g.
+   `feat: add billing dashboard (#0003)`).
 2. **Read the repo's `.claude/valk-config.md`** to decide what "done" means:
 
    ```bash

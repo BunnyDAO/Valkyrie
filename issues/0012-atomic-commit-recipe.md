@@ -2,7 +2,7 @@
 id: 0012
 title: Atomic-commit recipe in the tdd stage skill
 type: AFK
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/concurrency-hardening.md
 ---
