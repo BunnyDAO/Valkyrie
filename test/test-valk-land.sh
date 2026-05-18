@@ -166,4 +166,44 @@ gitc "$F_MAIN" log --format=%s origin/main | grep -q "feat: add feature" \
   || fail "0022a: passing gate did not land the work"
 echo "ok: 0022 test gate green — land completes"
 
+# --- 0023a: pr_skill configured + installed → delegate, no local land ---
+mkfixture s23a
+SBX="$WORK/s23a/home"; mkdir -p "$SBX/.claude/skills/to-fake-pr"
+: > "$SBX/.claude/skills/to-fake-pr/SKILL.md"
+mkdir -p "$F_MAIN/.claude"
+printf -- '---\npr_skill: to-fake-pr\n---\n' > "$F_MAIN/.claude/valk-config.md"
+o_before="$(git -C "$F_ORIGIN" rev-parse main)"
+m_before="$(gitc "$F_MAIN" rev-parse main)"
+b_before="$(gitc "$F_WT" rev-parse valk/feat)"
+out="$( cd "$F_MAIN" && HOME="$SBX" "$VL" feat 2>&1 )"; rc=$?
+[ "$rc" -eq 0 ] || fail "0023a: delegation should exit 0 (got $rc: $out)"
+[ "$(git -C "$F_ORIGIN" rev-parse main)" = "$o_before" ] \
+  || fail "0023a: valk-land must not push when delegating to pr_skill"
+[ "$(gitc "$F_MAIN" rev-parse main)" = "$m_before" ] \
+  || fail "0023a: valk-land must not ff local main when delegating"
+[ "$(gitc "$F_WT" rev-parse valk/feat)" = "$b_before" ] \
+  || fail "0023a: valk-land must not rebase when delegating"
+printf '%s' "$out" | grep -q "to-fake-pr" \
+  || fail "0023a: should name the pr_skill it delegates to (got: $out)"
+echo "ok: 0023 pr_skill installed — delegates, no local land/push"
+
+# --- 0023b: pr_skill configured but NOT installed → STOP, change nothing ---
+mkfixture s23b
+SBX="$WORK/s23b/home"; mkdir -p "$SBX/.claude"   # no skills/to-fake-pr
+mkdir -p "$F_MAIN/.claude"
+printf -- '---\npr_skill: to-fake-pr\n---\n' > "$F_MAIN/.claude/valk-config.md"
+o_before="$(git -C "$F_ORIGIN" rev-parse main)"
+m_before="$(gitc "$F_MAIN" rev-parse main)"
+out="$( cd "$F_MAIN" && HOME="$SBX" "$VL" feat 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0023b: pr_skill not installed must STOP (non-zero)"
+[ "$(git -C "$F_ORIGIN" rev-parse main)" = "$o_before" ] \
+  || fail "0023b: STOP must change nothing (origin)"
+[ "$(gitc "$F_MAIN" rev-parse main)" = "$m_before" ] \
+  || fail "0023b: STOP must change nothing (local main)"
+printf '%s' "$out" | grep -q "to-fake-pr" \
+  || fail "0023b: error should name the missing pr_skill"
+printf '%s' "$out" | grep -qiE 'not installed|install' \
+  || fail "0023b: error should say it is not installed"
+echo "ok: 0023 pr_skill configured but not installed — STOP, change nothing"
+
 exit 0

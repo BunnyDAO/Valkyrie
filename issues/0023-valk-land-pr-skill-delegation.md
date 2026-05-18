@@ -2,7 +2,7 @@
 id: 0023
 title: valk-land pr_skill delegation path
 type: AFK
-status: open
+status: done
 blocked_by: [0019]
 parent: docs/prd/valk-land.md
 ---
@@ -22,15 +22,21 @@ silently fall back to a local land).
 
 ## Acceptance criteria
 
-- [ ] With a `pr_skill` configured (injected config + a stub skill/marker),
+- [x] With a `pr_skill` configured (injected config + a stub skill/marker),
       `valk-land` delegates the land: no local rebase/ff of main, no push by
       `valk-land` itself, no double-push
-- [ ] `pr_skill` set but not installed → `valk-land` STOPs with a clear
+- [x] `pr_skill` set but not installed → `valk-land` STOPs with a clear
       error and changes nothing (no local land fallback)
-- [ ] With no `pr_skill`, behavior is the local path (unchanged from
+- [x] With no `pr_skill`, behavior is the local path (unchanged from
       0019–0022) — the split is driven solely by the opt-in config
-- [ ] Bash test in `test/` covers delegated / not-installed / absent
+- [x] Bash test in `test/` covers delegated / not-installed / absent
       (config injected via temp `.claude/valk-config.md`); suite stays green
+
+> Done. pr_skill checked before any local work: installed (`.claude/skills/
+> <name>` in repo or `$HOME`, the tdd install convention) → step aside,
+> exit 0, no rebase/ff/push; configured-but-not-installed → STOP non-zero,
+> nothing changed; absent → local path (0019–0022 unchanged). Suite 12/12,
+> `test-noop` byte-green.
 
 ## Blocked by
 

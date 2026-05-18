@@ -43,6 +43,22 @@ RVC="$(cd "$(dirname "$self")" && pwd)/read-valk-config.sh"
 git -C "$root" rev-parse --verify -q "refs/heads/$branch" >/dev/null || {
   echo "valk-land: no branch $branch" >&2; exit 1; }
 
+# Delegate-or-local split (PRD's load-bearing decision). If the repo opts
+# into a pr_skill, valk-land does NONE of the local land — the PR path is
+# owned by that skill (invoked by the tdd/agent flow, which pushes the
+# branch and opens the PR). valk-land is a script and cannot invoke an agent
+# skill, so it steps aside cleanly; "installed" mirrors the tdd contract
+# (a .claude/skills/<name> entry, repo-scoped or in $HOME).
+pr="$("$RVC" --repo "$root" pr_skill 2>/dev/null || true)"
+if [ -n "$pr" ] && [ "$pr" != "none" ]; then
+  if [ -e "$root/.claude/skills/$pr" ] || [ -e "$HOME/.claude/skills/$pr" ]; then
+    echo "valk-land: this repo lands via pr_skill '$pr' (set in .claude/valk-config.md). valk-land does not run the PR path itself — your tdd/agent flow invokes '$pr', which pushes $branch and opens the PR. Nothing landed locally; no push."
+    exit 0
+  fi
+  echo "valk-land: pr_skill '$pr' is configured but not installed (no .claude/skills/$pr in the repo or \$HOME). Refusing to land — install '$pr' or set 'pr_skill: none' in .claude/valk-config.md." >&2
+  exit 1
+fi
+
 # Must run from the main checkout (we fast-forward main here). Refusing from
 # inside the branch's own worktree mirrors valk-worktree --remove's stance.
 cur="$(git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null)"
