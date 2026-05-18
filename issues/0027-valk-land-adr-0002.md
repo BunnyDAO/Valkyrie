@@ -2,7 +2,7 @@
 id: 0027
 title: Seed docs/adr/0002 — valk-land delegation & no-force
 type: AFK
-status: open
+status: done
 blocked_by: []
 parent: docs/prd/valk-land.md
 ---
@@ -34,14 +34,19 @@ written at any time.
 
 ## Acceptance criteria
 
-- [ ] `docs/adr/0002-valk-land-delegation-and-no-force.md` exists in the
+- [x] `docs/adr/0002-valk-land-delegation-and-no-force.md` exists in the
       house ADR format and is the second entry in the ADR log
-- [ ] It states the delegate-or-local rationale and why always-PR was
+- [x] It states the delegate-or-local rationale and why always-PR was
       rejected
-- [ ] It states the never-force-push and rebase-linear rationale
-- [ ] It references ADR-0001 and is consistent with it (companion, not a
+- [x] It states the never-force-push and rebase-linear rationale
+- [x] It references ADR-0001 and is consistent with it (companion, not a
       second cure)
-- [ ] No code/behavior change; existing tests stay green
+- [x] No code/behavior change; existing tests stay green
+
+> Done. ADR-0002 seeded in the house format (Status/Context/Decision/
+> Considered options/Consequences), records delegate-or-local vs always-PR,
+> never-force-push, rebase-linear, and links ADR-0001 as the parent. Docs
+> only; suite 12/12.
 
 ## Blocked by
 
