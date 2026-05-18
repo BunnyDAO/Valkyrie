@@ -245,4 +245,20 @@ gitc "$F_MAIN" rev-parse --verify -q valk/feat >/dev/null \
   || fail "0024d: failed land must not have dropped the branch"
 echo "ok: 0024 --clean + failed land — nothing destructive"
 
+# --- 0025: installer PATH-registers valk-land, like afk/valk-worktree ---
+# Sandbox HOME so a *global* install is fully isolated (temp ~/.claude AND
+# temp ~/.local/bin) — the dev machine is never mutated.
+SBX="$WORK/inst-home"; mkdir -p "$SBX"
+HOME="$SBX" bash "$REPO/install.sh" >/dev/null 2>&1 \
+  || fail "0025: install.sh (global, sandboxed HOME) exited non-zero"
+[ -L "$SBX/.local/bin/valk-land" ] \
+  || fail "0025: install.sh did not PATH-symlink valk-land"
+[ "$(readlink "$SBX/.local/bin/valk-land")" = "$REPO/scripts/valk-land" ] \
+  || fail "0025: valk-land symlink does not point at scripts/valk-land"
+[ -L "$SBX/.local/bin/valk-worktree" ] \
+  || fail "0025: regression — valk-worktree no longer PATH-registered"
+[ -L "$SBX/.local/bin/afk" ] \
+  || fail "0025: regression — afk no longer PATH-registered"
+echo "ok: 0025 installer PATH-registers valk-land (afk + valk-worktree intact)"
+
 exit 0

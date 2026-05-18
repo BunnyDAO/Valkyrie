@@ -179,6 +179,17 @@ fi
 ln -sfn "$REPO/scripts/valk-worktree" "$target"
 echo "  + valk-worktree -> $REPO/scripts/valk-worktree"
 
+# valk-land: ergonomic, race-free integrate-back companion to valk-worktree.
+# PATH-registered exactly like afk / valk-worktree.
+chmod +x "$REPO/scripts/valk-land"
+target="$LOCAL_BIN/valk-land"
+if [ -e "$target" ] && [ ! -L "$target" ]; then
+  echo "  - existing non-symlink valk-land in $LOCAL_BIN — backing up to ${target}.bak"
+  mv "$target" "${target}.bak"
+fi
+ln -sfn "$REPO/scripts/valk-land" "$target"
+echo "  + valk-land -> $REPO/scripts/valk-land"
+
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
   echo "  NOTE: $LOCAL_BIN is not on your PATH. Add this to your shell rc:"

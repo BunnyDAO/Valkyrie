@@ -2,7 +2,7 @@
 id: 0025
 title: install.sh PATH-registers valk-land like afk/valk-worktree
 type: AFK
-status: open
+status: done
 blocked_by: [0019]
 parent: docs/prd/valk-land.md
 ---
@@ -18,14 +18,14 @@ unchanged.
 
 ## Acceptance criteria
 
-- [ ] A global `install.sh` PATH-symlinks `valk-land` →
+- [x] A global `install.sh` PATH-symlinks `valk-land` →
       `scripts/valk-land`, with the same backup/`+x` handling as
       `afk`/`valk-worktree`
-- [ ] Verified behaviorally via a **sandboxed `HOME`** install (mirroring
+- [x] Verified behaviorally via a **sandboxed `HOME`** install (mirroring
       the `valk-worktree` installer-test pattern) so the dev machine is
       never mutated; `afk` + `valk-worktree` stay registered (no regression)
-- [ ] `test-target-install.sh` stays green (scoped install unaffected)
-- [ ] Full suite stays green
+- [x] `test-target-install.sh` stays green (scoped install unaffected)
+- [x] Full suite stays green
 
 ## Blocked by
 
