@@ -303,4 +303,78 @@ printf '%s' "$out" | grep -q 'set-head' \
   || fail "0028b: hint must name 'git remote set-head origin -a' (got: $out)"
 echo "ok: 0028 unresolvable origin/HEAD — abort, preserve, set-head hint"
 
+# --- 0029a: --base lets a genuinely-unresolvable-origin/HEAD repo land ---
+d29="$WORK/s29a"; s="$d29/seed"; og="$d29/origin.git"; mn="$d29/proj"; w="$d29/proj-feat"; ot="$d29/other"
+mkdir -p "$s"
+gitc "$s" init -q
+echo base > "$s/file.txt"; gitc "$s" add -A; gitc "$s" commit -qm base
+gitc "$s" branch -M master
+git clone -q --bare "$s" "$og"
+git -C "$og" symbolic-ref HEAD refs/heads/nonexistent       # origin/HEAD unresolvable
+git clone -q "$og" "$mn" 2>/dev/null
+gitc "$mn" fetch -q origin
+gitc "$mn" branch master origin/master
+gitc "$mn" checkout -q master
+gitc "$mn" branch valk/feat
+gitc "$mn" worktree add -q "$w" valk/feat
+echo feature > "$w/feature.txt"; gitc "$w" add -A; gitc "$w" commit -qm "feat: add feature"
+git clone -q "$og" "$ot" 2>/dev/null
+gitc "$ot" fetch -q origin; gitc "$ot" checkout -q -B master origin/master
+echo other > "$ot/other.txt"; gitc "$ot" add -A; gitc "$ot" commit -qm "other: concurrent work"
+gitc "$ot" push -q origin master
+( cd "$mn" && "$VL" feat --base master --force ) \
+  || fail "0029a: --base master must let an unresolvable-origin/HEAD repo land"
+gitc "$mn" fetch -q origin
+L="$(gitc "$mn" log --format=%s origin/master)"
+printf '%s\n' "$L" | grep -q "feat: add feature"     || fail "0029a: origin/master missing feature commit"
+printf '%s\n' "$L" | grep -q "other: concurrent work" || fail "0029a: origin/master lost concurrent commit"
+[ -z "$(gitc "$mn" log --merges --format=%H origin/master)" ] || fail "0029a: history not linear"
+echo "ok: 0029 --base — unresolvable origin/HEAD repo lands via --base"
+
+# --- 0029c: unresolved + no --base → abort, hint names BOTH remedies ---
+d29c="$WORK/s29c"; s="$d29c/seed"; og="$d29c/origin.git"; mn="$d29c/proj"; w="$d29c/proj-feat"
+mkdir -p "$s"
+gitc "$s" init -q
+echo base > "$s/file.txt"; gitc "$s" add -A; gitc "$s" commit -qm base
+gitc "$s" branch -M master
+git clone -q --bare "$s" "$og"
+git -C "$og" symbolic-ref HEAD refs/heads/nonexistent
+git clone -q "$og" "$mn" 2>/dev/null
+gitc "$mn" fetch -q origin
+gitc "$mn" branch master origin/master
+gitc "$mn" checkout -q master
+gitc "$mn" branch valk/feat
+gitc "$mn" worktree add -q "$w" valk/feat
+echo feature > "$w/feature.txt"; gitc "$w" add -A; gitc "$w" commit -qm "feat: add feature"
+o_before="$(git -C "$og" rev-parse master)"
+out="$( cd "$mn" && "$VL" feat --force 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0029c: unresolved + no --base must exit non-zero"
+[ "$(git -C "$og" rev-parse master)" = "$o_before" ] || fail "0029c: origin must be untouched"
+printf '%s' "$out" | grep -q 'set-head'    || fail "0029c: hint must still name set-head (got: $out)"
+printf '%s' "$out" | grep -q -- '--base'   || fail "0029c: hint must also name --base (got: $out)"
+echo "ok: 0029 unresolved + no --base — hint names both remedies"
+
+# --- 0029b: --base is honored even when origin/HEAD is resolvable ---
+mkfixture s29b            # normal main-default repo (origin/HEAD resolvable)
+( cd "$F_MAIN" && "$VL" feat --base main --force ) \
+  || fail "0029b: explicit --base main must land on a normal repo"
+gitc "$F_MAIN" fetch -q origin
+L="$(gitc "$F_MAIN" log --format=%s origin/main)"
+printf '%s\n' "$L" | grep -q "feat: add feature"     || fail "0029b: origin/main missing feature"
+printf '%s\n' "$L" | grep -q "other: concurrent work" || fail "0029b: origin/main lost concurrent"
+echo "ok: 0029 --base honored even when origin/HEAD resolvable"
+
+# --- 0029d: parser regression — --base needs a value; old errors intact ---
+mkfixture s29d
+out="$( cd "$F_MAIN" && "$VL" feat --base 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0029d: --base with no value must exit non-zero"
+printf '%s' "$out" | grep -qi 'branch name' || fail "0029d: --base error should say it needs a branch name (got: $out)"
+out="$( cd "$F_MAIN" && "$VL" feat --bogus 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0029d: unknown option must still exit non-zero"
+printf '%s' "$out" | grep -q 'unknown option' || fail "0029d: unknown-option message regressed (got: $out)"
+out="$( cd "$F_MAIN" && "$VL" feat extra 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0029d: a 2nd positional must still exit non-zero"
+printf '%s' "$out" | grep -q 'unexpected argument' || fail "0029d: unexpected-argument message regressed (got: $out)"
+echo "ok: 0029 parser — --base needs value; unknown-option & 2nd-positional intact"
+
 exit 0

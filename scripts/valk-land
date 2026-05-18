@@ -16,17 +16,20 @@ name=""
 no_push=0
 force=0
 clean=0
-for arg in "$@"; do
-  case "$arg" in
-    --no-push) no_push=1 ;;
-    --force) force=1 ;;
-    --clean) clean=1 ;;
-    -*) echo "valk-land: unknown option: $arg" >&2; exit 2 ;;
-    *) [ -n "$name" ] && { echo "valk-land: unexpected argument: $arg" >&2; exit 2; }
-       name="$arg" ;;
+base_override=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-push) no_push=1; shift ;;
+    --force) force=1; shift ;;
+    --clean) clean=1; shift ;;
+    --base) [ -n "${2:-}" ] || { echo "valk-land: --base needs a branch name" >&2; exit 2; }
+            base_override="$2"; shift 2 ;;
+    -*) echo "valk-land: unknown option: $1" >&2; exit 2 ;;
+    *) [ -n "$name" ] && { echo "valk-land: unexpected argument: $1" >&2; exit 2; }
+       name="$1"; shift ;;
   esac
 done
-[ -n "$name" ] || { echo "usage: valk-land <name> [--no-push]" >&2; exit 2; }
+[ -n "$name" ] || { echo "usage: valk-land <name> [--no-push] [--base <branch>]" >&2; exit 2; }
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "valk-land: not inside a git repository" >&2; exit 1; }
@@ -74,15 +77,18 @@ fi
 git -C "$root" fetch -q origin || { echo "valk-land: git fetch failed" >&2; exit 1; }
 
 # Resolve the repo's default branch — its "base". Never assume it is named
-# `main`: origin/HEAD (set at clone) names the remote's default; strip the
-# refs/remotes/origin/ prefix. (An explicit --base override and a richer hint
-# when this cannot be resolved are issue 0029.)
-base="$(git -C "$root" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)"
-base="${base#refs/remotes/origin/}"
+# `main`. An explicit --base always wins; otherwise origin/HEAD (set at clone)
+# names the remote's default — strip the refs/remotes/origin/ prefix.
+if [ -n "$base_override" ]; then
+  base="$base_override"
+else
+  base="$(git -C "$root" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)"
+  base="${base#refs/remotes/origin/}"
+fi
 # Never guess (ADR-0002/0003): if the default branch can't be determined,
 # abort before touching anything and tell the user the one-line remedy.
 if [ -z "$base" ] || ! git -C "$root" rev-parse --verify -q "origin/$base" >/dev/null; then
-  echo "valk-land: cannot determine the repo's default branch — refs/remotes/origin/HEAD is unset. Run 'git -C \"$root\" remote set-head origin -a' to set it, then re-run 'valk-land $name'." >&2
+  echo "valk-land: cannot determine a valid default branch (refs/remotes/origin/HEAD is unset, or --base names a branch with no origin/<name>). Either run 'git -C \"$root\" remote set-head origin -a', or re-run with '--base <branch>' naming a branch that exists on origin. Then re-run 'valk-land $name'." >&2
   exit 1
 fi
 

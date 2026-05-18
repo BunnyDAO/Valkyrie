@@ -2,7 +2,7 @@
 id: 0029
 title: valk-land --base override + safe abort when the base is unresolvable
 type: AFK
-status: open
+status: done
 blocked_by: [0028]
 parent: docs/prd/valk-land-default-branch.md
 ---
