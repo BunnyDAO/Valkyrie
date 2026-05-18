@@ -83,4 +83,32 @@ gitc "$F_WT" log --format=%s valk/feat | grep -q "feat: add feature" \
   || fail "0020b: local main not restored after the refused push"
 echo "ok: 0020 origin-moved — abort, preserve branch+main, re-run; never force"
 
+# --- 0021: rebase conflict → abort clean, byte-untouched, precise guidance --
+mkfixture s21
+echo "feat side"  > "$F_WT/file.txt"          # valk/feat edits the shared file
+gitc "$F_WT" add -A; gitc "$F_WT" commit -qm "feat: edit shared file"
+oc="$WORK/s21/oclone"; git clone -q "$F_ORIGIN" "$oc"
+echo "main side" > "$oc/file.txt"             # origin/main edits it differently
+gitc "$oc" add -A; gitc "$oc" commit -qm "main: edit shared file"
+gitc "$oc" push -q origin main
+b_before="$(gitc "$F_WT" rev-parse valk/feat)"
+o_before="$(git -C "$F_ORIGIN" rev-parse main)"
+out="$( cd "$F_MAIN" && "$VL" feat 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0021: a conflict must make valk-land exit non-zero"
+[ "$(gitc "$F_WT" rev-parse valk/feat)" = "$b_before" ] \
+  || fail "0021: valk/feat not byte-unchanged (rebase not aborted)"
+[ "$(git -C "$F_WT" symbolic-ref --short -q HEAD)" = "valk/feat" ] \
+  || fail "0021: worktree left detached / mid-rebase (not aborted cleanly)"
+git -C "$F_WT" status --porcelain | grep -q '^UU' \
+  && fail "0021: conflict markers left in the worktree"
+[ "$(cat "$F_WT/file.txt")" = "feat side" ] \
+  || fail "0021: worktree file not restored to pre-call content"
+[ "$(git -C "$F_ORIGIN" rev-parse main)" = "$o_before" ] \
+  || fail "0021: origin modified during a conflicting land"
+printf '%s' "$out" | grep -qF "$F_WT"        || fail "0021: guidance must name the worktree"
+printf '%s' "$out" | grep -qE '(^|[^a-z])cd ' || fail "0021: guidance must give the explicit cd step"
+printf '%s' "$out" | grep -q 'git rebase'    || fail "0021: guidance must give the rebase command"
+printf '%s' "$out" | grep -q 'valk-land feat' || fail "0021: guidance must say to re-run valk-land"
+echo "ok: 0021 conflict — abort clean, byte-untouched, precise guidance, no push"
+
 exit 0

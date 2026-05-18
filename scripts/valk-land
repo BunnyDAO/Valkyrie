@@ -53,7 +53,17 @@ wt="$(git -C "$root" worktree list --porcelain \
 
 if ! git -C "$wt" rebase -q origin/main; then
   git -C "$wt" rebase --abort >/dev/null 2>&1
-  echo "valk-land: rebase onto origin/main hit a conflict — resolve it in $wt, then re-run" >&2
+  {
+    echo "valk-land: rebase of $branch onto origin/main hit a conflict."
+    echo "Nothing was changed — $branch and its worktree are exactly as before,"
+    echo "origin/main is untouched. valk-land does not auto-resolve. Resolve it"
+    echo "by hand in the worktree, then re-run:"
+    echo
+    echo "  cd $wt"
+    echo "  git rebase origin/main      # redo the rebase, fix the conflicts"
+    echo "  # …edit files, git add, git rebase --continue (or --abort to back out)"
+    echo "  valk-land $name             # re-run once the rebase is clean"
+  } >&2
   exit 1
 fi
 

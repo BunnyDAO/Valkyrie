@@ -2,7 +2,7 @@
 id: 0021
 title: valk-land conflict policy — abort clean, preserve, guide
 type: AFK
-status: open
+status: done
 blocked_by: [0019]
 parent: docs/prd/valk-land.md
 ---
@@ -22,14 +22,19 @@ judgement a real conflict requires.
 
 ## Acceptance criteria
 
-- [ ] An induced rebase conflict causes `valk-land` to `git rebase --abort`;
+- [x] An induced rebase conflict causes `valk-land` to `git rebase --abort`;
       `valk/<name>` and the worktree are byte-unchanged vs. before the call
-- [ ] `origin/main` is not modified; nothing is pushed
-- [ ] Output contains actionable manual-resolve guidance referencing the
+- [x] `origin/main` is not modified; nothing is pushed
+- [x] Output contains actionable manual-resolve guidance referencing the
       worktree and a re-run of `valk-land`
-- [ ] Exit code is non-zero (failure signalled) but state is provably safe
-- [ ] Bash test in `test/` induces a real conflict against a simulated
+- [x] Exit code is non-zero (failure signalled) but state is provably safe
+- [x] Bash test in `test/` induces a real conflict against a simulated
       origin and asserts the above; full suite stays green
+
+> Done. The rebase happens in the branch's own worktree, so `rebase --abort`
+> there restores it byte-for-byte; origin is never touched (abort precedes
+> push). Guidance is precise multi-line steps (cd, redo rebase, re-run).
+> Suite 12/12, `test-noop` byte-green.
 
 ## Blocked by
 
