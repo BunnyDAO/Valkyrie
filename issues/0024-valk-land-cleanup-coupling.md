@@ -2,7 +2,7 @@
 id: 0024
 title: valk-land cleanup coupling — opt-in --clean
 type: AFK
-status: open
+status: done
 blocked_by: [0019]
 parent: docs/prd/valk-land.md
 ---
@@ -26,16 +26,21 @@ composable.
 
 ## Acceptance criteria
 
-- [ ] Default green land removes nothing and prints the exact
+- [x] Default green land removes nothing and prints the exact
       `valk-worktree --remove <name>` hint
-- [ ] `--clean` on a green land removes the worktree and drops the merged
+- [x] `--clean` on a green land removes the worktree and drops the merged
       `valk/<name>` branch (reusing the existing `valk-worktree --remove`
       behavior, not a reimplementation)
-- [ ] `--clean` invoked with `cwd` inside the target worktree refuses with a
+- [x] `--clean` invoked with `cwd` inside the target worktree refuses with a
       clear "cd out first" message and removes nothing
-- [ ] `--clean` does nothing destructive if the land itself did not succeed
-- [ ] Bash test in `test/` covers default-hint / `--clean` / refuse-from-
+- [x] `--clean` does nothing destructive if the land itself did not succeed
+- [x] Bash test in `test/` covers default-hint / `--clean` / refuse-from-
       inside / no-op-on-failed-land; full suite stays green
+
+> Done. `--clean` calls the real `valk-worktree --remove` (sibling script,
+> not reimplemented) only after a confirmed push; default prints the exact
+> hint. Refuse-from-inside is the pre-existing "run from the main checkout"
+> guard (fires before any land/clean). Suite 12/12, `test-noop` byte-green.
 
 ## Blocked by
 

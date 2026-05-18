@@ -206,4 +206,43 @@ printf '%s' "$out" | grep -qiE 'not installed|install' \
   || fail "0023b: error should say it is not installed"
 echo "ok: 0023 pr_skill configured but not installed — STOP, change nothing"
 
+# --- 0024a: default green land removes nothing, prints the remove hint ---
+mkfixture s24a
+out="$( cd "$F_MAIN" && "$VL" feat --force 2>&1 )" || fail "0024a: land should succeed"
+[ -d "$F_WT" ] || fail "0024a: default land must NOT remove the worktree"
+gitc "$F_MAIN" rev-parse --verify -q valk/feat >/dev/null \
+  || fail "0024a: default land must NOT drop the branch"
+printf '%s' "$out" | grep -qF "valk-worktree --remove feat" \
+  || fail "0024a: default land must print the exact remove hint (got: $out)"
+echo "ok: 0024 default — keeps worktree, prints exact remove hint"
+
+# --- 0024b: --clean tears down the worktree + merged branch ---
+mkfixture s24b
+( cd "$F_MAIN" && "$VL" feat --force --clean ) || fail "0024b: --clean land should succeed"
+gitc "$F_MAIN" fetch -q origin
+gitc "$F_MAIN" log --format=%s origin/main | grep -q "feat: add feature" \
+  || fail "0024b: --clean must still land the work first"
+[ ! -d "$F_WT" ] || fail "0024b: --clean must remove the worktree"
+gitc "$F_MAIN" rev-parse --verify -q valk/feat >/dev/null \
+  && fail "0024b: --clean must drop the merged valk/feat branch"
+echo "ok: 0024 --clean — lands then tears down worktree + merged branch"
+
+# --- 0024c: --clean from inside the target worktree refuses, removes nothing ---
+mkfixture s24c
+out="$( cd "$F_WT" && "$VL" feat --force --clean 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0024c: --clean from inside the worktree must refuse (non-zero)"
+[ -d "$F_WT" ] || fail "0024c: refusal must not remove the worktree"
+printf '%s' "$out" | grep -qi "main checkout" \
+  || fail "0024c: refusal should tell the user to run from the main checkout"
+echo "ok: 0024 --clean from inside worktree — refuses, removes nothing"
+
+# --- 0024d: --clean does nothing destructive if the land did not succeed ---
+mkfixture s24d   # no test_skill, no --force → gate refuses before landing
+out="$( cd "$F_MAIN" && "$VL" feat --clean 2>&1 )"; rc=$?
+[ "$rc" -ne 0 ] || fail "0024d: failed land must be non-zero"
+[ -d "$F_WT" ] || fail "0024d: failed land must not have removed the worktree"
+gitc "$F_MAIN" rev-parse --verify -q valk/feat >/dev/null \
+  || fail "0024d: failed land must not have dropped the branch"
+echo "ok: 0024 --clean + failed land — nothing destructive"
+
 exit 0

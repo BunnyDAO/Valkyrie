@@ -15,10 +15,12 @@ set -u
 name=""
 no_push=0
 force=0
+clean=0
 for arg in "$@"; do
   case "$arg" in
     --no-push) no_push=1 ;;
     --force) force=1 ;;
+    --clean) clean=1 ;;
     -*) echo "valk-land: unknown option: $arg" >&2; exit 2 ;;
     *) [ -n "$name" ] && { echo "valk-land: unexpected argument: $arg" >&2; exit 2; }
        name="$arg" ;;
@@ -38,7 +40,9 @@ if [ -L "$self" ]; then
   link="$(readlink "$self")"
   case "$link" in /*) self="$link" ;; *) self="$(dirname "$self")/$link" ;; esac
 fi
-RVC="$(cd "$(dirname "$self")" && pwd)/read-valk-config.sh"
+SCRIPTS_DIR="$(cd "$(dirname "$self")" && pwd)"
+RVC="$SCRIPTS_DIR/read-valk-config.sh"
+VWT="$SCRIPTS_DIR/valk-worktree"
 
 git -C "$root" rev-parse --verify -q "refs/heads/$branch" >/dev/null || {
   echo "valk-land: no branch $branch" >&2; exit 1; }
@@ -139,3 +143,14 @@ if ! git -C "$root" push -q origin main; then
 fi
 
 echo "✓ landed $branch onto origin/main"
+
+# Cleanup coupling — opt-in, never by surprise. Only after a real push.
+if [ "$clean" -eq 1 ]; then
+  # (Running from inside the worktree is already refused far above by the
+  #  "run from the main checkout" guard, so reaching here means we're safe.)
+  ( cd "$root" && "$VWT" --remove "$name" ) \
+    || echo "valk-land: landed, but 'valk-worktree --remove $name' did not complete — run it by hand." >&2
+else
+  echo "  done with it? drop the worktree + (now-merged) branch:"
+  echo "    valk-worktree --remove $name"
+fi
