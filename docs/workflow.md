@@ -204,20 +204,33 @@ create     valk-worktree <name>     # ../<repo>-<name> on branch valk/<name>
                                      # runs optional .valk-worktree-setup
 work       cd ../<repo>-<name>      # this terminal is now isolated
                                      # run /valk … /tdd here as normal
-integrate  merge or PR  valk/<name> → main branch   (MANUAL — see below)
+integrate  valk-land <name>           # supported ergonomic path (or manual)
 cleanup    valk-worktree --remove <name>            # drops the merged branch
 ```
 
 - **One worktree per terminal/flow.** Each flow gets its own
   `valk/<name>` branch and its own checkout; concurrent flows can no longer
   corrupt each other.
-- **Integrate-back is manual for now.** When a flow's slice is done, land
-  its `valk/<name>` branch on the main branch yourself via merge or PR —
-  the same review you'd do for any branch. Automating this (a `valk-land`
-  companion: auto-rebase vs PR, CI gating, conflict policy) is a **separate,
-  deliberately deferred PRD** — tracked as issue #0018, not built yet and
-  not implied to exist. Until it is designed, this manual merge/PR path is
-  the supported integrate-back.
+- **Integrate-back: `valk-land <name>` (supported) or manual.** When a
+  flow's slice is done, `valk-land <name>` lands its `valk/<name>` branch
+  the way the repo already says it wants PRs handled:
+  - **`pr_skill` configured** (`.claude/valk-config.md`) → `valk-land`
+    steps aside; that skill owns the PR (push, review, CI). It never
+    double-pushes.
+  - **no `pr_skill`** (local-first default) → it fetches, rebases
+    `valk/<name>` onto fresh `origin/main`, runs the repo's `test_skill`
+    gate on the rebased tree (red → abort, nothing pushed; no signal →
+    refuse unless `--force`), fast-forwards `main`, and sync-safe pushes
+    (origin moved again → abort + re-run; **never** force-pushes). A rebase
+    conflict aborts cleanly with the branch + worktree byte-untouched and
+    precise resolve steps. `--no-push` stays local; `--clean` also tears
+    down the worktree (refuses from inside it).
+
+  The **manual** merge/PR path (`git switch main && git merge valk/<name>`,
+  or open a PR) stays fully valid and documented — `valk-land` is the
+  ergonomic default, not a replacement. **Honest limit (ADR-0001):**
+  `valk-land` makes the merge work ergonomic and race-free; it does **not**
+  eliminate merge conflicts or the human judgement a real conflict needs.
 - **Cleanup.** `valk-worktree --remove <name>` removes the worktree and
   drops the `valk/<name>` branch *only if it is merged* (an unmerged branch
   is kept so no work is lost).

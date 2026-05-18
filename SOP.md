@@ -487,16 +487,24 @@ residue is irreducible without isolation. So isolate:
 valk-worktree feature-a        # creates ../<repo>-feature-a on valk/feature-a
 cd ../<repo>-feature-a         # this terminal is now isolated — run /valk here
 # … flow runs to done on its own valk/feature-a branch …
-git switch main && git merge valk/feature-a   # integrate-back (manual; or open a PR)
+valk-land feature-a                           # integrate-back (supported) — or merge/PR by hand
 valk-worktree --remove feature-a              # cleanup (drops the merged branch)
 ```
 
 - **One `valk-worktree <name>` per terminal.** Each flow works on its own
   `valk/<name>` branch in its own checkout. Concurrency stops being a hazard.
-- **Integrate-back is manual:** merge or PR each `valk/<name>` branch to the
-  main branch, with the review you'd give any branch. A `valk-land` helper to
-  automate this is a **deferred, separately-designed PRD** (tracked, not built
-  — see issue #0018); until then this manual path is the supported one.
+- **Integrate-back: `valk-land <name>` (supported) or manual.** `valk-land`
+  lands the branch the way the repo already handles PRs: if
+  `.claude/valk-config.md` sets a `pr_skill`, it steps aside and that skill
+  owns the PR (no double-push); otherwise it rebases `valk/<name>` onto fresh
+  `origin/main`, runs the repo's `test_skill` gate (red → abort, nothing
+  pushed; no signal → `--force` required), fast-forwards `main`, and
+  sync-safe pushes — **never** force-pushing, aborting cleanly on conflict
+  with the branch + worktree untouched. `--clean` also tears down the
+  worktree (refuses from inside it). The manual `git merge`/PR path stays
+  fully valid; `valk-land` is the ergonomic default, not a replacement.
+  *(ADR-0001 honest limit: it makes the merge work ergonomic and race-free,
+  it does not eliminate conflicts.)*
 - **Cleanup:** `valk-worktree --remove <name>` removes the worktree and drops
   the branch *only if merged* (unmerged branches are kept — no lost work).
 - The prompt guard nudges you toward `valk-worktree` if you're still in the
