@@ -195,6 +195,29 @@ capture.ts retry logic is fragile; only touch it with tests.
 - Glossary: ./CONTEXT.md  ·  Decisions: ./docs/adr/  ·  Cross-repo: ../PRODUCT-MAP.md
 ```
 
+**And the umbrella `PRODUCT-MAP.md` that ties those repos together:**
+
+```md
+# Product Map: Acme Checkout
+
+## Overview
+Three repos assembled by the installer into the Acme Checkout product.
+
+## Member Repos
+- **ledger-svc** — owns account balances — [DOMAIN.md](ledger-svc/DOMAIN.md)
+- **payments-svc** — payment capture & refunds — [DOMAIN.md](payments-svc/DOMAIN.md)
+- **checkout-web** — the storefront UI — [DOMAIN.md](checkout-web/DOMAIN.md)
+
+## Build / Assembly Order
+ledger-svc → payments-svc → checkout-web. payments-svc must keep the v1 /capture ABI.
+
+## Cross-Repo Contracts
+- **PaymentCaptured event** — payments-svc → ledger-svc: ledger debits on this event;
+  reshaping or renaming it breaks balance updates.
+- **POST /capture** — checkout-web → payments-svc: the storefront's capture call; breaking
+  its shape breaks checkout.
+```
+
 Field-by-field specs for each: [`DOMAIN-FORMAT.md`](skills/to-domain/DOMAIN-FORMAT.md),
 [`PRODUCT-MAP-FORMAT.md`](skills/to-product-map/PRODUCT-MAP-FORMAT.md),
 [`INTENT-FORMAT.md`](skills/to-intent/INTENT-FORMAT.md). End-to-end walkthrough (single- and

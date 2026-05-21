@@ -216,6 +216,23 @@ Builder skills write plain markdown; teams stamping many repos can render the co
 `*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-compose) for fail-loud
 required-field validation.
 
+**Worked example (end to end).** Say your product is assembled from `ledger-svc`,
+`payments-svc`, and `checkout-web`:
+
+1. **Once, at the umbrella root:** `/to-product-map` → writes `PRODUCT-MAP.md` — the three
+   repos, the build order, and the cross-repo contracts (e.g. the `PaymentCaptured` event).
+2. **Once per repo:** `/to-domain` in `payments-svc` → writes its `DOMAIN.md` (owns capture &
+   refunds, depends on `ledger-svc`, must keep the v1 `/capture` ABI).
+3. **Now do real work:** "let's add refunds." DESIGN opens with the **Intent Lock** — it reads
+   `payments-svc/DOMAIN.md`, makes you state the *why* (no guessing), and flags that refunds
+   touch `ledger-svc` via a cross-repo contract in `PRODUCT-MAP.md`. You resolve that *before*
+   any code exists.
+4. → **PRD** (kept inside those bounds) → **REVIEW-PRD** → **ISSUES** → **TDD**. The TDD gate
+   blocks any production-code edit until you actually reach TDD.
+
+Write none of these docs and step 3 still runs — it just has less to ground itself in. That's
+"enforcement scales with what you write" in practice.
+
 ---
 
 ## 4. The standard workflow
