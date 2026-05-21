@@ -21,6 +21,14 @@ This skill takes the current conversation context and codebase understanding and
 
 1. **Explore the repo** to understand the current state of the codebase, if you haven't already. Use the project's domain glossary (`CONTEXT.md` if present) throughout the PRD, and respect any ADRs in the area you're touching.
 
+   **Respect the domain and intent docs when they exist (all optional, no-op if absent):**
+   - `DOMAIN.md` / `PRODUCT-MAP.md` — the PRD must stay within the stated bounds. Cite the
+     domain it lives in; if a decision crosses a domain boundary or a cross-repo contract,
+     call it out explicitly in *Implementation Decisions* and *Out of Scope*.
+   - `docs/intent/<slug>.md` (if `/to-intent` was run) — the PRD's *Problem Statement* and
+     *Solution* must match the recorded why, in/out-of-scope, and success criteria. If the
+     grilling diverged from the brief, reconcile it before writing — do not silently drift.
+
 2. **Sketch the major modules** you will need to build or modify. Actively look for opportunities to extract **deep modules** — small, stable interfaces hiding a lot of behavior — that can be tested in isolation.
 
    Check with the user that the module list matches their expectations. Ask which modules they want tests written for.

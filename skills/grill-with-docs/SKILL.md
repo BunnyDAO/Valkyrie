@@ -15,6 +15,35 @@ Mark the stage so the statusline shows DESIGN:
 python3 ~/.claude/valkyrie/stage.py set design
 ```
 
+## Intent Lock — first, before any grilling
+
+Before exploring *how* to build anything, lock **why** and **where**. This is the most
+failure-prone moment in the workflow: if intent is fuzzy or the domain is wrong, every
+downstream decision inherits the error. **You are forbidden from filling gaps with
+inference here.** Every unknown is a question, never an assumption.
+
+Run it as a tight exchange, in order:
+
+1. **Why** — what's true after this ships, the business/UI/technical rationale, why it
+   matters now, and the trade-offs being accepted. If any of these is unstated, ask —
+   do not guess.
+2. **Where (the domain)** — which repo / subsystem / bounded context this lives in.
+   - If a `DOMAIN.md` (and `PRODUCT-MAP.md` for multi-repo products) exists, read it and
+     state the bounds back: "We're in the *X* domain — it owns *Y*, depends on *Z*."
+   - If none exists, have the user name the domain in words (a `DOMAIN.md` is **not**
+     required). If this repo will see more work, offer `/to-domain` to capture it.
+3. **Reflect and confirm** — restate the intent in one or two sentences and the domain in
+   one. The user must confirm or sharpen **in their own words**. A bare "yes" / "build X"
+   / "you know what I mean" is **not** a lock — push back exactly like the PRD gate does:
+   > "That's not a locked intent yet. In one sentence: what's true after this ships, and
+   > what domain are we in?"
+4. **Offer to persist** — once locked, offer `/to-intent` to write `docs/intent/<slug>.md`
+   (optional; the intent also flows into the PRD regardless).
+
+Only once intent + domain are locked do you move into the grilling below. If the user
+opened with a crystal-clear why and domain, acknowledge it and move on — don't manufacture
+friction. The rule is *no inference*, not *no momentum*.
+
 ## What to do
 
 Interview the user relentlessly about every aspect of this plan until you reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one at a time. For each question, provide your **recommended answer** so the user can react rather than ideate from scratch.
@@ -25,7 +54,21 @@ Interview the user relentlessly about every aspect of this plan until you reach 
 
 ## Domain awareness
 
-During codebase exploration, also look for existing documentation:
+During codebase exploration, also look for existing documentation. Three distinct
+artifacts may exist — keep them separate, they do different jobs:
+
+- **`CONTEXT.md`** — the **glossary** (terms, relationships). Format below.
+- **`DOMAIN.md`** — the repo's **bounds**: purpose, system integration map, installer/
+  assembly relationship, legacy constraints, pain points. If present, read it before
+  grilling and **ground every challenge in its stated bounds**. If the user's plan reaches
+  outside those bounds, *flag it*: "DOMAIN.md says this repo owns X and depends on Y — but
+  that change touches Z, which is out of this domain. Is that intended?" Authored by
+  `/to-domain`; no-op if absent.
+- **`PRODUCT-MAP.md`** — for multi-repo products: the member repos, build/assembly order,
+  and cross-repo contracts. If a change spans repos, read it and name the contracts at
+  risk. Authored by `/to-product-map`; no-op if absent.
+
+`DOMAIN.md` / `PRODUCT-MAP.md` are *optional*. When absent, behave exactly as before.
 
 ### File structure
 

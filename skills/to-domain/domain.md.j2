@@ -1,0 +1,40 @@
+---
+required_variables:
+  - repo_name
+  - purpose
+  - depends_on
+  - depended_on_by
+  - key_contracts
+  - installer_relationship
+  - legacy_constraints
+  - pain_points
+defaults:
+  context_link: "./CONTEXT.md"
+  adr_link: "./docs/adr/"
+  product_map_link: "../PRODUCT-MAP.md"
+metadata:
+  purpose: per-repo DOMAIN.md — bounds, integration map, installer relationship, constraints
+---
+# Domain: {{ repo_name }}
+
+## Repository Purpose
+{{ purpose }}
+
+## System Integration Map
+- **Depends on:** {{ depends_on }}
+- **Depended on by:** {{ depended_on_by }}
+- **Key contracts & data flows:** {{ key_contracts }}
+
+## Installer / Assembly Relationship
+{{ installer_relationship }}
+
+## Legacy Constraints & Gotchas
+{{ legacy_constraints }}
+
+## Pain Points
+{{ pain_points }}
+
+## Pointers
+- Glossary: [CONTEXT.md]({{ context_link }})
+- Decisions: [docs/adr/]({{ adr_link }})
+- Cross-repo map: [PRODUCT-MAP.md]({{ product_map_link }})

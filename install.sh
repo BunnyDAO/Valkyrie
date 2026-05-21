@@ -78,9 +78,9 @@ echo "  + $PM_DIR/cost-helper.py"
 echo "  + $PM_DIR/rates.json"
 echo "  + $PM_DIR/crew-shim"
 
-# --- 3. UserPromptSubmit hook ----------------------------------------------
+# --- 3. hooks: UserPromptSubmit guard + PreToolUse TDD gate ----------------
 
-echo "==> installing UserPromptSubmit hook into $HOOKS_DIR"
+echo "==> installing hooks into $HOOKS_DIR"
 cp "$REPO/scripts/valk-guard.sh" "$HOOKS_DIR/valk-guard.sh"
 chmod +x "$HOOKS_DIR/valk-guard.sh"
 if [ "$SCOPED" -eq 1 ]; then
@@ -91,6 +91,12 @@ if [ "$SCOPED" -eq 1 ]; then
   rm -f "$HOOKS_DIR/valk-guard.sh.bak"
 fi
 echo "  + $HOOKS_DIR/valk-guard.sh"
+
+# PreToolUse hard gate: mechanically blocks production-code edits until TDD.
+# Reads the stage from the tool's cwd directly, so no --target re-point is needed.
+cp "$REPO/scripts/valk-tdd-gate.sh" "$HOOKS_DIR/valk-tdd-gate.sh"
+chmod +x "$HOOKS_DIR/valk-tdd-gate.sh"
+echo "  + $HOOKS_DIR/valk-tdd-gate.sh"
 
 # --- 4. patch settings.json -------------------------------------------------
 
@@ -109,12 +115,14 @@ settings_path = Path("$SETTINGS")
 # $CLAUDE_HOME-derived so a --target (project-scoped) install writes
 # target-scoped paths; for the default global install this is ~/.claude.
 hook_path = "$CLAUDE_HOME/hooks/valk-guard.sh"
+gate_path = "$CLAUDE_HOME/hooks/valk-tdd-gate.sh"
 statusline_path = "$CLAUDE_HOME/valkyrie/statusline.py"
 
 # On Windows, convert to Git Bash format (/c/Users/... instead of C:Users...)
 if sys.platform == 'win32' and len(hook_path) > 2 and hook_path[1] == ':':
     # Convert C:Users... to /c/Users/... (using chr(92) for backslash to avoid escaping issues)
     hook_path = '/' + hook_path[0].lower() + hook_path[2:].replace(chr(92), '/')
+    gate_path = '/' + gate_path[0].lower() + gate_path[2:].replace(chr(92), '/')
     statusline_path = '/' + statusline_path[0].lower() + statusline_path[2:].replace(chr(92), '/')
 data = {}
 if settings_path.exists() and settings_path.stat().st_size > 0:
@@ -142,6 +150,19 @@ already_wired = any(
 if not already_wired:
     ups.append({"hooks": [{"type": "command", "command": hook_path}]})
 
+# Merge the PreToolUse TDD gate the same idempotent way. The matcher keeps it off
+# the hot path for tools it never acts on.
+pre = hooks.setdefault("PreToolUse", [])
+gate_wired = any(
+    any(h.get("command") == gate_path for h in entry.get("hooks", []))
+    for entry in pre if isinstance(entry, dict)
+)
+if not gate_wired:
+    pre.append({
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+        "hooks": [{"type": "command", "command": gate_path}],
+    })
+
 # Ensure parent directory exists (important for Windows)
 settings_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -149,6 +170,7 @@ try:
     settings_path.write_text(json.dumps(data, indent=2) + "\\n")
     print(f"  + statusLine -> python3 {statusline_path}")
     print(f"  + UserPromptSubmit hook -> {hook_path}")
+    print(f"  + PreToolUse TDD gate -> {gate_path}")
 except Exception as e:
     print(f"  ✗ Failed to write settings.json: {e}", file=sys.stderr)
     sys.exit(1)

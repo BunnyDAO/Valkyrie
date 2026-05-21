@@ -13,6 +13,10 @@ __pycache__/
 # Node (for marp tooling if anyone installs it locally)
 node_modules/
 
+# sc-compose workspace/logs (created locally when rendering the *.j2 templates)
+.sc-compose/
+.prompts/
+
 # Editor
 .vscode/
 .idea/

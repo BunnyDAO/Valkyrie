@@ -16,8 +16,10 @@ Two diagrams. The **interactive workflow** describes a single slice from prompt 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ STAGE 1 ── DESIGN  ▶ DESIGN                                          │
 │  /grill-with-docs                                                    │
-│   • interview user one Q at a time                                   │
-│   • cross-reference codebase + CONTEXT.md + docs/adr/                │
+│   • INTENT LOCK first — lock why + domain (NO inference)             │
+│       reads DOMAIN.md / PRODUCT-MAP.md if present; flags drift       │
+│   • then interview user one Q at a time                              │
+│   • cross-reference codebase + CONTEXT.md + DOMAIN.md + docs/adr/    │
 │   • update CONTEXT.md inline as terms resolve                        │
 │   • write ADRs sparingly (hard-to-reverse + surprising)              │
 │   • exit: "ready to turn this into a PRD?"                           │
@@ -244,6 +246,69 @@ is per-repo and language-agnostic; full contract +
 sample: [`valk-worktree-setup-format.md`](./valk-worktree-setup-format.md).
 `valk-worktree` works fully without it (pure git is the cure).
 
+## Optional domain & intent docs (and the Intent Lock)
+
+DESIGN now opens with an **Intent Lock**: before any grilling, `/grill-with-docs` makes you
+state *why* (the outcome, the rationale, the trade-offs) and *which domain* you're in — and
+it is **forbidden from filling those gaps with inference**. Every unknown is a question. This
+is honor-based discipline inside the skill; the *files* below are what make it durable.
+
+All three docs are **optional and no-op when absent** — same opt-in spirit as
+`valk-config.md`. **Enforcement scales with the docs you provide:** write nothing and you get
+today's behavior plus the forced why-first beat; write a `DOMAIN.md` and the agent is held to
+its bounds; add a `PRODUCT-MAP.md` and it respects cross-repo contracts too.
+
+| Doc | Scope | Built by | Read by |
+|---|---|---|---|
+| `CONTEXT.md` | per repo — glossary (unchanged) | `/grill-with-docs` (inline) | grilling, PRD |
+| `DOMAIN.md` | per repo — bounds, integration map, installer relationship, constraints | `/to-domain` | grilling (grounds challenges, flags drift), PRD |
+| `PRODUCT-MAP.md` | umbrella — member repos, assembly order, cross-repo contracts | `/to-product-map` | grilling + PRD when a change spans repos |
+| `docs/intent/<slug>.md` | per task — the why + scope + success criteria | `/to-intent` | grilling, PRD (must stay consistent) |
+
+The builder skills author plain markdown. Teams stamping many repos can instead render the
+co-located `*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-compose), which
+declares the required fields up front and **fails loudly** if any is missing — sc-compose is
+an *authoring* convenience only; Valkyrie never needs it at runtime.
+
+### Single-repo flow
+
+```
+(optional) /to-domain                 # write DOMAIN.md once for this repo
+"let's build X"  → ▶ DESIGN           # Intent Lock reads DOMAIN.md, locks why+domain
+                 → ▶ PRD → REVIEW-PRD # PRD stays within DOMAIN.md's bounds
+                 → ▶ ISSUES → ▶ TDD
+```
+
+### Multi-repo flow (product assembled from many repos)
+
+```
+(optional) /to-product-map            # write PRODUCT-MAP.md at the umbrella root
+(optional) /to-domain  (per repo)     # write each member repo's DOMAIN.md
+"let's change X across repos"
+                 → ▶ DESIGN           # Intent Lock reads PRODUCT-MAP.md + the relevant
+                                      #   DOMAIN.md(s); names the cross-repo contracts at risk
+                 → ▶ PRD → REVIEW-PRD # PRD calls out boundary/contract crossings explicitly
+                 → ▶ ISSUES → ▶ TDD
+```
+
+## The hard TDD gate
+
+Stage rules used to be purely honor-based — the model *chose* to obey. The **`PreToolUse`
+hook `valk-tdd-gate.sh`** turns "no production code before TDD" into a mechanical wall:
+
+- While the stage is `design` / `prd` / `prd-review` / `issues`, edits to **production code**
+  are **denied at the tool layer** — `Edit`/`Write`/`NotebookEdit`, plus best-effort coverage
+  of file-writing `Bash` (`echo > foo.ts`).
+- **Workflow artifacts stay writable:** anything under `docs/`, `issues/`, `.claude/valk/`,
+  and any `*.md` (so `DOMAIN.md`, PRDs, and issue files are never blocked).
+- **`idle`, `tdd`, `afk`, `refactor` are not gated** — idle means you're not in a flow, and
+  the rest legitimately edit code. To implement, reach `tdd` or run `/valk --skip-to tdd`.
+
+**Honest limits:** airtight for the edit tools (clear `file_path`); best-effort for `Bash`
+(it only blocks writes that clearly target a source file); and, since it's the user's own
+machine, disableable. The threat model is **model drift, not sabotage** — against drift it's
+a real wall. Installed and wired into `settings.json` by `install.sh`.
+
 ## Config gates at a glance
 
 | Gate | Where it reads | Behavior when set | Behavior when unset |
@@ -265,8 +330,10 @@ flowchart TD
     H -->|trivial| Bypass[Skip Valkyrie]
     H -->|build request| V[/valk orchestrator]
 
-    V --> S1["▶ DESIGN<br/>/grill-with-docs"]
+    V --> S1["▶ DESIGN<br/>/grill-with-docs<br/>Intent Lock first: why + domain (no inference)"]
+    S1 -.reads.-> Dom["DOMAIN.md / PRODUCT-MAP.md<br/>(optional)"]
     S1 -.writes.-> Ctx[CONTEXT.md<br/>docs/adr/*]
+    Gate["PreToolUse gate · valk-tdd-gate.sh<br/>blocks production-code edits<br/>during DESIGN / PRD / ISSUES"] -.guards.-> S4
     S1 --> S2["▶ PRD<br/>/to-prd"]
     S2 --> PRD[docs/prd/&lt;slug&gt;.md]
     PRD --> GATE{"▶ REVIEW-PRD<br/>decisions shown inline<br/>substantive approval?"}

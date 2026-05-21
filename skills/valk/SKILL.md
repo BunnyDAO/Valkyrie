@@ -9,11 +9,27 @@ You are operating the **Valkyrie** workflow. Your job is to refuse to skip stage
 
 The stages, in order:
 
-1. **DESIGN** — `grill-with-docs` skill. Stress-test the idea by interviewing the user.
+1. **DESIGN** — `grill-with-docs` skill. **Opens with an Intent Lock** — lock *why* + *which domain* (no inference) — then stress-test the idea by interviewing the user.
 2. **PRD** — `to-prd` skill. Synthesize the design into a PRD document.
    - **PRD-REVIEW** — a hard gate inside the PRD stage. `to-prd` surfaces the decisions inline and the human must substantively approve before anything proceeds. This is the highest-leverage checkpoint in the workflow: a wrong PRD poisons every downstream issue and every line of code. Statusline shows ▶ REVIEW-PRD.
 3. **ISSUES** — `to-issues` skill. Break the PRD into independently-grabbable vertical slices.
 4. **TDD** — `tdd` skill. Implement each issue red-green-refactor.
+
+## Optional inputs & the hard gate
+
+**Optional domain/intent docs** strengthen the flow when present and are no-ops when absent
+(same opt-in spirit as `valk-config.md`). Their authoring helpers — suggest or invoke them,
+but they are *not* stages:
+
+- `/to-domain` → a repo's `DOMAIN.md` (bounds, integration map, installer relationship, constraints).
+- `/to-product-map` → an umbrella `PRODUCT-MAP.md` (member repos, build order, cross-repo contracts) for multi-repo products.
+- `/to-intent` → a per-task `docs/intent/<slug>.md` (the why + scope). Optional; intent is also locked inline at the top of DESIGN.
+
+**The TDD gate is mechanical, not honor-based.** A `PreToolUse` hook (`valk-tdd-gate.sh`)
+*blocks* edits to production code while the stage is `design` / `prd` / `prd-review` /
+`issues` — docs, PRDs, issues, and any `*.md` stay writable. If you try to write code too
+early, the edit is denied at the tool layer, not merely discouraged here. To implement, the
+flow must reach `tdd` (or the user runs `/valk --skip-to tdd`).
 
 ## Your behavior
 

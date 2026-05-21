@@ -43,12 +43,14 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 |---|---|---|---|
 | Skills | `~/.claude/skills/{valk,grill-with-docs,to-prd,to-issues,tdd,zoom-out,refactor-spaghetti}/` | Global | The workflow logic. Symlinks back into the repo, so `git pull` updates them. |
 | Statusline + stage helper | `~/.claude/valkyrie/{statusline.py,stage.py}` | Global | Renders the ▶ STAGE pill; reads/writes the stage file. |
-| UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Hard enforcement — see §2. |
+| UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Soft-start enforcement — nudges build prompts into `/valk`. See §2. |
+| PreToolUse TDD gate | `~/.claude/hooks/valk-tdd-gate.sh` | Global, runs on edit/Bash tool calls | Hard wall — mechanically blocks production-code edits before TDD. See §2. |
 | Settings glue | `~/.claude/settings.json` | Global | Wires the statusline + hook. Patched in place. |
 | Stage marker | `<repo>/.claude/valk/stage` | Per-project | Current workflow stage. Each repo tracks its own. |
 | AFK logs | `<repo>/.claude/valk/afk-logs/` | Per-project | One log file per `afk` iteration. |
 | PRDs | `<repo>/docs/prd/<slug>.md` | Per-project | Output of `/to-prd`. |
 | Issues | `<repo>/issues/0001-*.md` | Per-project | Output of `/to-issues`. Vertical slices with frontmatter. |
+| Domain/intent docs (optional) | `<repo>/DOMAIN.md`, `<repo>/PRODUCT-MAP.md`, `<repo>/docs/intent/*.md` | Per-project | Output of `/to-domain`, `/to-product-map`, `/to-intent`. No-op if absent. |
 | `afk` binary | `~/.local/bin/afk` → repo | Global | The autonomous loop. Run from any project directory. |
 
 **What's accessible from any directory:** the slash commands (`/valk`, `/grill-with-docs`, etc.), the hook, the statusline, the `afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
@@ -140,19 +142,79 @@ Submit any prompt in Claude Code, then `cat ~/.claude/hooks/valk-guard.log`. If 
 
 If you need the hook off for a session, comment out the `hooks` block in `~/.claude/settings.json`. The change applies on your next prompt — no restart. Don't delete the script — you'll want it back.
 
+### The PreToolUse TDD gate — the second, harder layer
+
+The UserPromptSubmit hook nudges you *into* the workflow. It doesn't stop the model from
+drifting once inside — and honor-based stage rules drift, especially in long sessions and AFK
+runs. The **PreToolUse gate** (`~/.claude/hooks/valk-tdd-gate.sh`, installed and wired by
+`install.sh`) closes that gap mechanically:
+
+- While the stage is `design` / `prd` / `prd-review` / `issues`, edits to **production code**
+  are **denied at the tool layer** — `Edit` / `Write` / `NotebookEdit`, plus best-effort
+  coverage of file-writing `Bash` (e.g. `echo … > foo.ts`). The model literally cannot write
+  source before TDD.
+- **Workflow artifacts stay writable at every stage:** anything under `docs/`, `issues/`,
+  `.claude/valk/`, and any `*.md` — so PRDs, issue files, and `DOMAIN.md` are never blocked.
+- **Not gated:** `idle` (you're not in a flow), `tdd` / `afk` (implementation), and
+  `refactor`. To implement, reach `tdd` or run `/valk --skip-to tdd`.
+
+Smoke test:
+
+```bash
+printf '{"tool_name":"Edit","cwd":"%s","tool_input":{"file_path":"src/x.ts"}}' "$PWD" \
+  | ~/.claude/hooks/valk-tdd-gate.sh        # at design stage → JSON with permissionDecision "deny"
+```
+
+**Honest limits:** airtight for the edit tools (clear `file_path`); best-effort for `Bash`
+(only blocks writes that clearly target a source file); disableable, since it's your machine.
+The threat model is **model drift, not sabotage** — against drift it's a real wall. Disable it
+the same way as the guard: remove its entry from the `hooks` block in `settings.json`.
+
 ---
 
 ## 3. The four stages — what they're for
 
 | Stage | Skill | What you do | What you DON'T do |
 |---|---|---|---|
-| **DESIGN** | `/grill-with-docs` | Answer the AI's questions about the plan. One question at a time. | Skip ahead. Outsource thinking. |
+| **DESIGN** | `/grill-with-docs` | First answer the **Intent Lock** (the *why* + which domain — stated, not guessed), then the AI's design questions, one at a time. | Skip ahead. Outsource thinking. Let it infer your intent. |
 | **PRD** | `/to-prd` | Read the PRD it generates. ~5 minutes. Edit anything wrong. | Treat the PRD as a formality. |
 | **PRD-REVIEW** | (gate in `/to-prd`) | Engage with the decisions it shows you inline. Confirm one in your own words, or redline one. | Reply "yes"/"lgtm" — the gate rejects it and won't proceed. |
 | **ISSUES** | `/to-issues` | Confirm the vertical-slice breakdown. Adjust dependencies. | Accept thick slices that touch one layer only. |
 | **TDD** | `/tdd` | Watch the red-green-refactor loop. Catch test smells. | Let it write all tests upfront — that's horizontal slicing. |
 
 **The DESIGN stage is where the value compounds.** If you spend 20 minutes there, you'll save 2 hours in TDD because the AI isn't guessing what you want.
+
+### Optional: make it domain-aware
+
+By default the AI only knows what you tell it in the moment. These optional docs give it a
+written frame of reference so it grounds its grilling in your real domain instead of guessing.
+**All are no-ops when absent** — adopt them at your own pace; enforcement scales with what you
+write.
+
+- **`/to-domain`** → a repo's **`DOMAIN.md`** at the repo root. Write it for any repo that'll
+  see repeated work, or whose integrations/constraints are non-obvious. Captures: purpose,
+  system integration map (depends-on / depended-on-by / key contracts), installer/assembly
+  relationship, legacy constraints, pain points. Once it exists, grilling grounds every
+  challenge in it and **flags drift** when a plan reaches outside its bounds, and the PRD stays
+  inside them.
+- **`/to-product-map`** → an umbrella **`PRODUCT-MAP.md`**, *only* for a product assembled from
+  many repos: member repos, build/assembly order, cross-repo contracts. Generalizes to any
+  number of repos. Read whenever a change spans repos.
+- **`/to-intent`** → a per-task brief at **`docs/intent/<slug>.md`** for any change whose *why*
+  is non-trivial: outcome, why, in/out of scope, success criteria, trade-offs. The DESIGN
+  **Intent Lock** captures this inline regardless; the file just makes it durable and reviewable.
+
+Keep them single-purpose — that's why they're separate files: `CONTEXT.md` = glossary
+(unchanged), `DOMAIN.md` = bounds, `docs/adr/` = decisions, `PRODUCT-MAP.md` = cross-repo view.
+
+Field-by-field specs ship inside each skill (`skills/to-domain/DOMAIN-FORMAT.md`,
+`skills/to-product-map/PRODUCT-MAP-FORMAT.md`, `skills/to-intent/INTENT-FORMAT.md`). A worked
+`DOMAIN.md` example is in `README.md` → "Optional domain & intent docs"; the full single- and
+multi-repo walkthrough is in `docs/workflow.md`.
+
+Builder skills write plain markdown; teams stamping many repos can render the co-located
+`*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-compose) for fail-loud
+required-field validation.
 
 ---
 

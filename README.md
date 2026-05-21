@@ -20,6 +20,8 @@ The goal: **5x your engineers without overcomplicating things** by making them t
   - `/to-issues` — break the PRD into independently-grabbable vertical slices (ISSUES stage)
   - `/tdd` — implement each slice red-green-refactor (TDD stage)
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
+- **Optional domain & intent docs (progressive enhancement)** — three authoring skills that strengthen the flow *only when you use them*, and are no-ops otherwise: `/to-domain` (a repo's `DOMAIN.md` — bounds, integrations, installer relationship, constraints), `/to-product-map` (an umbrella `PRODUCT-MAP.md` for multi-repo products), and `/to-intent` (a per-task intent brief). DESIGN also opens with an **Intent Lock** that forbids filling the *why* and domain with inference.
+- **A hard TDD gate** — a `PreToolUse` hook (`valk-tdd-gate.sh`) that *mechanically* blocks production-code edits until the TDD stage, so "no code before TDD" is a wall, not a polite refusal. Docs, PRDs, issues, and any `*.md` stay writable.
 - **An `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
 
 ## Install
@@ -132,7 +134,76 @@ When `pr_skill` is set, `afk`'s done-check derives state from the agent-written 
 
 **This is opt-in.** Repos without `.claude/valk-config.md` see no change in behavior — `/tdd` marks issues done locally and `afk` reads the frontmatter, exactly as before.
 
-Full format spec: [`docs/valk-config-format.md`](docs/valk-config-format.md).
+Full format spec: [`docs/valk-config-format.md`](docs/valk-config-format.md). The
+`valk-config.md` file and the crew shim it drives come from **HiveOp / crew**
+([crew.hiveop.io](https://crew.hiveop.io)) — see [`docs/crew.md`](docs/crew.md) for what crew
+is and how it binds to Valkyrie.
+
+### Optional domain & intent docs
+
+Out of the box, Valkyrie knows nothing about *your* codebase's bounds — so DESIGN grilling can
+only push on what you say in the moment. These optional docs give the workflow a durable,
+written frame of reference, so the agent grounds its questions in your real domain instead of
+inferring. **All are no-ops when absent** — write none and behavior is exactly as before; write
+more and enforcement scales up.
+
+They are deliberately **four single-purpose docs**, not one big one — each stays small and
+doesn't rot into the others:
+
+- **`CONTEXT.md`** — the *glossary* (terms & relationships). Written inline by `/grill-with-docs`. **Unchanged by this feature.**
+- **`DOMAIN.md`** — the repo's *bounds*. Written by `/to-domain`.
+- **`docs/adr/*.md`** — *decisions*. `DOMAIN.md` **links** to them; it never restates them.
+- **`PRODUCT-MAP.md`** — the *cross-repo* view, for multi-repo products. Written by `/to-product-map`.
+
+…plus a per-task **`docs/intent/<slug>.md`** (the *why* of one change) written by `/to-intent`.
+
+| Doc | Lives at | Write it when | Holds |
+|---|---|---|---|
+| `DOMAIN.md` | repo root | a repo will see repeated work, or its integrations/constraints are non-obvious | purpose; system integration map (depends-on / depended-on-by / key contracts); installer/assembly relationship; legacy constraints; pain points |
+| `PRODUCT-MAP.md` | product umbrella root | your product is assembled from multiple repos | member repos; build/assembly order; cross-repo contracts |
+| `docs/intent/<slug>.md` | per task | a task's *why* is non-trivial and worth pinning before design | outcome; why; in/out of scope; success criteria; trade-offs |
+
+Once a `DOMAIN.md` exists, `/grill-with-docs` reads it before grilling, grounds every challenge
+in its bounds, and **flags drift** when a plan reaches outside them; `/to-prd` then keeps the
+PRD inside them. `PRODUCT-MAP.md` does the same for changes that span repos. And DESIGN always
+opens with an **Intent Lock** — it makes you state the *why* and name the domain first, and is
+forbidden from filling those gaps with inference (every unknown becomes a question).
+
+**What a `DOMAIN.md` looks like:**
+
+```md
+# Domain: payments-svc
+
+## Repository Purpose
+Owns payment capture and refunds. Does NOT own ledger balances (that's ledger-svc).
+
+## System Integration Map
+- Depends on: ledger-svc (reads balances)
+- Depended on by: checkout-web (calls the capture API)
+- Key contracts & data flows: POST /capture; emits the PaymentCaptured event
+
+## Installer / Assembly Relationship
+Built as an npm package, after ledger-svc, before checkout-web. Must keep the v1 /capture ABI.
+
+## Legacy Constraints & Gotchas
+Retry path in capture.ts predates idempotency keys — must not double-charge.
+
+## Pain Points
+capture.ts retry logic is fragile; only touch it with tests.
+
+## Pointers
+- Glossary: ./CONTEXT.md  ·  Decisions: ./docs/adr/  ·  Cross-repo: ../PRODUCT-MAP.md
+```
+
+Field-by-field specs for each: [`DOMAIN-FORMAT.md`](skills/to-domain/DOMAIN-FORMAT.md),
+[`PRODUCT-MAP-FORMAT.md`](skills/to-product-map/PRODUCT-MAP-FORMAT.md),
+[`INTENT-FORMAT.md`](skills/to-intent/INTENT-FORMAT.md). End-to-end walkthrough (single- and
+multi-repo): [`docs/workflow.md`](docs/workflow.md).
+
+The builder skills write plain markdown. Teams stamping many repos can instead render the
+co-located `*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-compose), which
+declares required fields up front and **fails loudly** if any is missing. sc-compose is an
+authoring convenience only — Valkyrie reads plain markdown and never needs it at runtime.
 
 ### Escape hatches
 
@@ -168,10 +239,15 @@ Valkyrie/
 │   ├── to-prd/                # PRD synthesis
 │   ├── to-issues/             # vertical-slice issue breakdown
 │   ├── tdd/                   # red-green-refactor
+│   ├── to-domain/             # author a repo's DOMAIN.md (optional)
+│   ├── to-product-map/        # author an umbrella PRODUCT-MAP.md (optional)
+│   ├── to-intent/             # author a per-task intent brief (optional)
 │   ├── zoom-out/              # re-orient on unfamiliar code
 │   └── refactor-spaghetti/    # find deepening opportunities
 └── scripts/
-    └── afk              # autonomous loop, claude or codex
+    ├── afk                    # autonomous loop, claude or codex
+    ├── valk-guard.sh          # UserPromptSubmit: nudge into the flow
+    └── valk-tdd-gate.sh       # PreToolUse: block code edits before TDD
 ```
 
 ## Credits
