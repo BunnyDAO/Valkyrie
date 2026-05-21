@@ -13,6 +13,14 @@ Adapted from mattpocock/skills with Valkyrie stage tracking.
 python3 ~/.claude/valkyrie/stage.py set tdd
 ```
 
+**Cost discipline.** The main session orchestrates the red-green-refactor loop and owns the
+human checkpoints; where it helps, delegate a slice's actual implementation or a QA pass to a
+**single-task sonnet/haiku sub-agent** (Agent tool) and bring back just the result, to keep the
+main thread lean. If a delegated attempt fails QA ~twice, **escalate the sub-agent's model one
+tier** (haiku → sonnet → opus) rather than grinding on the cheap tier — opus is the ceiling,
+then surface to the human. (`afk --escalate` automates this per issue.) See `valk` →
+"Delegation & cost discipline".
+
 ## Philosophy
 
 **Core principle**: Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't.

@@ -34,11 +34,29 @@ Rules:
 - A completed slice is demoable or verifiable on its own
 - Prefer many thin slices over few thick ones
 
+**Parallelization analysis.** `blocked_by` *is* the parallelism map — two slices with no
+dependency path between them can run **concurrently, in separate worktrees**. As you slice:
+
+- **Minimize false dependencies.** Add a `blocked_by` edge only when one slice genuinely needs
+  another's merged output. Every spurious edge serializes work that could have run in parallel.
+- **Find the independent chains** in the resulting dependency DAG — those are your parallel
+  batches. Maximize how many can proceed at once.
+- **Map each chain to a worktree:** `valk-worktree <name>` gives a chain its own checkout +
+  `valk/<name>` branch; `valk-land <name>` integrates it back. The DAG is the source of truth —
+  don't add new frontmatter for parallelism.
+- For each slice, note **how it gets tested and built** (its GREEN signal), so a parallel
+  runner knows what "done" means without re-deriving it.
+
 ### 4. Surface the breakdown — terse, decision-ready
 
 Do NOT paste full issue bodies into chat. The files (saved in step 5) hold full content. In chat, emit ONE line per issue:
 
 `N. <title> [HITL|AFK] — blocked by: <ids or "none"> — covers: <user-story #s>`
+
+After the per-issue lines, add one **Parallel plan** line showing the independent batches and
+their worktrees, e.g.:
+
+`Parallel: [0001→0003] ∥ [0002→0004] ∥ [0005] — run each batch in its own valk-worktree`
 
 Then call `AskUserQuestion` with these options:
 
@@ -103,7 +121,10 @@ inlined for precision.
 
 ## After saving
 
-Tell the user how many issues were created and where:
-> "Created N issues in `issues/`. Ready to start TDD on the first unblocked one? Or `afk N` to chew through them all autonomously."
+Tell the user how many issues were created and where, and restate the parallel plan so they can
+fan the independent batches across worktrees:
+> "Created N issues in `issues/`. Parallel batches: [0001→0003] ∥ [0002→0004] — spin up a
+> `valk-worktree` per batch to run them concurrently, or `afk N` to chew through them
+> sequentially. Ready to start TDD on the first unblocked one?"
 
 Do NOT start `tdd` yourself — let the orchestrator transition.

@@ -228,6 +228,34 @@ co-located `*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-com
 declares required fields up front and **fails loudly** if any is missing. sc-compose is an
 authoring convenience only — Valkyrie reads plain markdown and never needs it at runtime.
 
+### Cost discipline (cheaper models + single-task delegation)
+
+The first stages — INTENT/DESIGN, PRD, ISSUES — write **no production code**; they're
+conversation and markdown. So don't pay the strongest model for them:
+
+- **Match the model to the stage.** At DESIGN, switch the main session with `/model sonnet`
+  (or haiku); switch back to your strongest model for TDD.
+- **Keep the main session an orchestrator.** Delegate codebase investigation and
+  code-writing/QA to **single-task sonnet/haiku sub-agents**, pulling back only the result —
+  so the main thread's context stays small. `/valk` and the stage skills are wired to nudge
+  this, and `afk` already runs one fresh single-issue session per slice.
+- **Escalate, don't open expensive.** Start delegated work on a cheap tier and bump only on
+  repeated failure — **haiku → sonnet → opus**, opus the ceiling, then a human. `afk --escalate`
+  does this mechanically per issue (retries a failing issue at the next tier before giving up).
+- **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
+  emits a batch plan; run each independent batch in its own `valk-worktree` to work concurrently
+  (integrate back with `valk-land`).
+
+To make it the default for **every** session (not just Valkyrie workflows), drop this into your
+`~/.claude/CLAUDE.md`:
+
+```md
+## Cost discipline (orchestration)
+- Use sonnet or haiku background agents for investigations, code-writing, and QA wherever appropriate and possible.
+- Keep the main session focused on orchestration so goals are met and context stays small.
+- Give each background agent a single task to limit its context overhead.
+```
+
 ### Escape hatches
 
 - `/zoom-out` — when you're lost in unfamiliar code

@@ -50,7 +50,7 @@ Interview the user relentlessly about every aspect of this plan until you reach 
 
 **Ask questions one at a time.** Wait for the user's answer before moving on. A grilling session is a back-and-forth, not an interrogation list.
 
-**If a question can be answered by exploring the codebase, explore the codebase instead.** Don't waste user attention on things you can verify yourself.
+**If a question can be answered by exploring the codebase, explore the codebase instead.** Don't waste user attention on things you can verify yourself. **Delegate each exploration to its own single-task sonnet/haiku sub-agent** (Agent tool) — one agent per question — and when several questions are independent, **spawn them in parallel** (multiple Agent calls in a single message). Bring back just the answers; DESIGN writes no code, so keep the main session lean (see `valk` → "Delegation & cost discipline").
 
 ## Domain awareness
 

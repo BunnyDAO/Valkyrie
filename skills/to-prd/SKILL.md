@@ -33,6 +33,8 @@ This skill takes the current conversation context and codebase understanding and
 
    Check with the user that the module list matches their expectations. Ask which modules they want tests written for.
 
+   **Note independence + verification per module:** which modules are independent (buildable/testable in parallel) vs. dependent on others, and how each is tested and built. This feeds the parallel issue breakdown in `to-issues` (where `blocked_by` becomes the parallelism map) — fewer false dependencies there means more slices can run concurrently across worktrees.
+
 3. **Write the PRD** using the template below.
 
 4. **Save it.** Default location: `docs/prd/<slug>.md` in the current repo. Create the directory if needed. If `gh` is configured and the user has previously asked to use issues, also create a tracker issue with the `ready-for-agent` label.

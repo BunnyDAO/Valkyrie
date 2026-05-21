@@ -31,6 +31,32 @@ but they are *not* stages:
 early, the edit is denied at the tool layer, not merely discouraged here. To implement, the
 flow must reach `tdd` (or the user runs `/valk --skip-to tdd`).
 
+## Delegation & cost discipline
+
+The main session is an **orchestrator**, not a worker. Keep its context lean and spend the
+expensive model only on coordination and the human-in-the-loop gates.
+
+- **Delegate the heavy lifting to single-task background agents.** Codebase investigation
+  (DESIGN) and code-writing + QA (TDD) should be handed to **sonnet or haiku** sub-agents via
+  the Agent tool — **one task per agent**, so each agent's context stays small. Pull back only
+  the result the main session needs to make the next decision; don't drag an agent's full
+  transcript into the main thread.
+- **Match the model to the stage.** INTENT/DESIGN, PRD, and ISSUES write *no production code* —
+  they're conversation and markdown, so a cheaper main-session model suffices. At those stages,
+  suggest the user run `/model sonnet` (or haiku); switch back to the strongest model for TDD.
+  If they're already on a cheap model, don't nag.
+- **One task per agent.** Never hand a background agent a multi-step grab-bag — scope it to a
+  single investigation, a single slice's implementation, or a single QA pass, then let it exit.
+- **Escalate on failure; don't open expensive.** Start a delegated task on a cheap tier; if it
+  fails ~twice, bump one tier (**haiku → sonnet → opus**), with opus the ceiling — then surface
+  to the human. Pick the *starting* tier by task type (haiku for reads/simple QA, sonnet for
+  most coding); starting too low can cost more in retries than starting a tier up. `afk
+  --escalate` does this mechanically, one issue at a time.
+
+This is honor-based guidance (a hook can't force a sub-agent spawn), but it's the difference
+between a lean orchestrator and a bloated, expensive main thread. (`afk` already embodies it —
+one fresh, single-issue session per slice.)
+
 ## Your behavior
 
 ### On entry

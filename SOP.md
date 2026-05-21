@@ -233,6 +233,38 @@ required-field validation.
 Write none of these docs and step 3 still runs — it just has less to ground itself in. That's
 "enforcement scales with what you write" in practice.
 
+### Cost discipline — cheaper models + single-task delegation
+
+INTENT/DESIGN, PRD, and ISSUES write **no production code** — they're conversation and
+markdown. Only TDD writes code. So don't burn the strongest (most expensive) model on the first
+three stages:
+
+- **Match the model to the stage.** Run DESIGN/PRD/ISSUES with `/model sonnet` (or haiku), then
+  switch back to your strongest model for TDD. On API billing that's the bulk of the saving;
+  on a subscription it's rate-limit budget you keep for implementation.
+- **Keep the main session an orchestrator.** Hand codebase investigation (DESIGN) and
+  code-writing/QA (TDD) to **single-task sonnet/haiku sub-agents** and pull back only the
+  result, so the main thread's context stays small. `/valk` and the stage skills nudge this;
+  `afk` already runs one fresh single-issue session per slice.
+- **Escalate instead of starting expensive.** Begin delegated work on a cheap tier; on repeated
+  failure bump one tier — **haiku → sonnet → opus** (opus the ceiling, then a human). Run it
+  hands-off with `afk --escalate`, which retries a failing issue at the next tier per iteration
+  before marking it stuck (`--escalate-tries N` for N shots per tier; default 1).
+- **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
+  prints the independent batches; spin up a `valk-worktree` per batch to run them concurrently,
+  then `valk-land` each back. (Sequential alternative: `afk N`.)
+
+To make this the default for **every** session — not just Valkyrie runs — add this block to
+your `~/.claude/CLAUDE.md` (it's auto-loaded once per session, so it costs nothing per turn —
+unlike pasting it each time):
+
+```md
+## Cost discipline (orchestration)
+- Use sonnet or haiku background agents for investigations, code-writing, and QA wherever appropriate and possible.
+- Keep the main session focused on orchestration so goals are met and context stays small.
+- Give each background agent a single task to limit its context overhead.
+```
+
 ---
 
 ## 4. The standard workflow

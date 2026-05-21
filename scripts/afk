@@ -18,11 +18,18 @@
 #
 # Usage:
 #   afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
+#                        [--escalate [--escalate-ladder "haiku sonnet opus"]
+#                                    [--escalate-tries N]]
 #
 # Examples:
 #   afk 10                       # 10 iterations using claude (default)
 #   afk 10 --cli codex           # same but using codex
 #   afk 5 --prompt-file pm.md    # override the per-iteration prompt
+#   afk 10 --escalate            # on a failing issue, retry at a higher model
+#                                #   tier before giving up (haiku→sonnet→opus).
+#                                #   claude only. Each attempt is one iteration
+#                                #   (counts against caps). Default 1 try/tier;
+#                                #   --escalate-tries 2 gives two shots per tier.
 
 set -euo pipefail
 
@@ -38,6 +45,9 @@ ALLOW_NO_PRD=""
 ALLOW_DIRTY=""
 ALLOW_DANGEROUS=""
 NO_CONFIRM=""
+ESCALATE=""
+ESCALATE_LADDER="haiku sonnet opus"
+ESCALATE_TRIES="1"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -45,6 +55,12 @@ while [ $# -gt 0 ]; do
       CLI="$2"; shift 2 ;;
     --prompt-file)
       PROMPT_FILE="$2"; shift 2 ;;
+    --escalate)
+      ESCALATE="1"; shift ;;
+    --escalate-ladder)
+      ESCALATE_LADDER="$2"; shift 2 ;;
+    --escalate-tries)
+      ESCALATE_TRIES="$2"; shift 2 ;;
     --max-hours)
       MAX_HOURS="$2"; shift 2 ;;
     --max-cost-usd)
@@ -78,7 +94,7 @@ if [ -n "$DEBUG_COST" ]; then
 fi
 
 if [ -z "$MAX_ITERS" ]; then
-  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>]" >&2
+  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>] [--escalate [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]]" >&2
   exit 2
 fi
 if ! [[ "$MAX_ITERS" =~ ^[0-9]+$ ]]; then
@@ -100,6 +116,28 @@ if ! command -v "$CLI" >/dev/null 2>&1; then
   echo "error: '$CLI' not on PATH" >&2; exit 2
 fi
 
+# --- escalation setup -------------------------------------------------------
+# Opt-in (--escalate): on a failed issue, retry it at the next model tier
+# before marking it stuck. claude-only — the ladder uses claude model aliases.
+LADDER_ARR=()
+LADDER_LEN=0
+MAX_ATTEMPTS=0
+if [ -n "$ESCALATE" ]; then
+  if [ "$CLI" != "claude" ]; then
+    echo "--escalate requires --cli claude (the ladder uses claude model aliases)" >&2; exit 2
+  fi
+  if ! [[ "$ESCALATE_TRIES" =~ ^[0-9]+$ ]] || [ "$ESCALATE_TRIES" -lt 1 ]; then
+    echo "--escalate-tries must be a positive integer (got: $ESCALATE_TRIES)" >&2; exit 2
+  fi
+  # shellcheck disable=SC2206  # word-splitting the ladder is intended
+  read -r -a LADDER_ARR <<< "$ESCALATE_LADDER"
+  LADDER_LEN=${#LADDER_ARR[@]}
+  if [ "$LADDER_LEN" -lt 1 ]; then
+    echo "--escalate-ladder must list at least one model (got: '$ESCALATE_LADDER')" >&2; exit 2
+  fi
+  MAX_ATTEMPTS=$(( LADDER_LEN * ESCALATE_TRIES ))
+fi
+
 # --- env --------------------------------------------------------------------
 
 REPO="$(pwd)"
@@ -107,6 +145,7 @@ ISSUES_DIR="$REPO/issues"
 STAGE_PY="$HOME/.claude/valkyrie/stage.py"
 LOG_DIR="$REPO/.claude/valk/afk-logs"
 CSV_PATH="$REPO/.claude/valk/afk-cost-history.csv"
+ESCALATION_DIR="$REPO/.claude/valk/afk-escalation"
 mkdir -p "$LOG_DIR"
 
 # Per-project config — empty PR_SKILL = pre-config behavior (current default).
@@ -507,6 +546,30 @@ pick_next_issue() {
   return 0
 }
 
+# --- escalation helpers (only used when --escalate) -------------------------
+# Per-issue attempt state lives in a sidecar file (bash 3.2 has no associative
+# arrays). One file per issue id, holding an integer attempt count.
+
+# Print the recorded attempt count for an issue id (0 if none).
+attempt_count() {
+  local f="$ESCALATION_DIR/$1"
+  if [ -f "$f" ]; then cat "$f"; else echo 0; fi
+}
+
+# Record the attempt count for an issue id.
+record_attempt() {
+  mkdir -p "$ESCALATION_DIR"
+  printf '%s\n' "$2" > "$ESCALATION_DIR/$1"
+}
+
+# Map a 0-based attempt number to a ladder model. Past the top tier it pins to
+# the strongest model (the ceiling).
+model_for_attempt() {
+  local idx=$(( $1 / ESCALATE_TRIES ))
+  [ "$idx" -ge "$LADDER_LEN" ] && idx=$(( LADDER_LEN - 1 ))
+  printf '%s\n' "${LADDER_ARR[$idx]}"
+}
+
 # Default per-iteration prompt — can be overridden with --prompt-file.
 default_prompt() {
   local issue_path="$1"
@@ -537,21 +600,34 @@ EOF
 }
 
 # Run the chosen CLI with the prompt, streaming output to terminal AND log.
+# $3 (optional) pins a model for this run (escalation); empty = CLI default.
 run_cli() {
   local prompt="$1"
   local logfile="$2"
+  local model="${3:-}"
 
   case "$CLI" in
     claude)
       # --print runs non-interactively; --dangerously-skip-permissions is
       # what AFK mode requires (no human to approve tool calls). Same flag
-      # Matt Pocock uses in his streaming wrapper.
-      echo "$prompt" | claude \
-        --print \
-        --dangerously-skip-permissions \
-        --output-format stream-json \
-        --verbose \
-        2>&1 | tee "$logfile"
+      # Matt Pocock uses in his streaming wrapper. Two branches (rather than a
+      # "${arr[@]}" splat) keep bash 3.2 + `set -u` happy on the empty case.
+      if [ -n "$model" ]; then
+        echo "$prompt" | claude \
+          --print \
+          --dangerously-skip-permissions \
+          --model "$model" \
+          --output-format stream-json \
+          --verbose \
+          2>&1 | tee "$logfile"
+      else
+        echo "$prompt" | claude \
+          --print \
+          --dangerously-skip-permissions \
+          --output-format stream-json \
+          --verbose \
+          2>&1 | tee "$logfile"
+      fi
       ;;
     codex)
       # codex equivalent — non-interactive, auto-approve tool use.
@@ -615,8 +691,18 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   ts="$(date +%Y%m%d-%H%M%S)"
   logfile="$LOG_DIR/iter-${iter}-${ts}.log"
 
+  # Escalation: pick the model tier for this issue's current attempt.
+  ISSUE_ID="$(basename "$next_issue" .md | cut -d- -f1)"
+  ITER_RUN_MODEL=""
+  cur_attempt=0
+  if [ -n "$ESCALATE" ]; then
+    cur_attempt="$(attempt_count "$ISSUE_ID")"
+    ITER_RUN_MODEL="$(model_for_attempt "$cur_attempt")"
+    echo "afk: escalation on — issue $ISSUE_ID attempt $((cur_attempt + 1))/$MAX_ATTEMPTS, model=$ITER_RUN_MODEL"
+  fi
+
   ITER_RC=0
-  run_cli "$prompt" "$logfile" || ITER_RC=$?
+  run_cli "$prompt" "$logfile" "$ITER_RUN_MODEL" || ITER_RC=$?
   if [ "$ITER_RC" -ne 0 ]; then
     echo "afk: $CLI exited $ITER_RC (see $logfile)." >&2
   fi
@@ -696,16 +782,40 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
     "${ITER_COST:-0}" "$CUMULATIVE_COST" "${ITER_COST_SRC:-computed}" "$pr_url_after"
 
   # Sanity check: if the issue is still open after the iteration, the agent
-  # didn't finish it. Don't loop forever on the same one.
+  # didn't finish it.
   if [ "$status_after" != "done" ] && [ "$status_after" != "stuck" ]; then
-    echo "afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
-    echo "afk: marking it 'stuck' so the loop moves on." >&2
-    awk '
-      BEGIN{in_fm=0; done=0}
-      /^---$/{in_fm = !in_fm; print; next}
-      in_fm && !done && /^status:/{print "status: stuck"; done=1; next}
-      {print}
-    ' "$next_issue" > "$next_issue.tmp" && mv "$next_issue.tmp" "$next_issue"
+    if [ -n "$ESCALATE" ]; then
+      # Escalation: retry the SAME issue at the next tier before giving up.
+      next_attempt=$(( cur_attempt + 1 ))
+      record_attempt "$ISSUE_ID" "$next_attempt"
+      if [ "$next_attempt" -lt "$MAX_ATTEMPTS" ]; then
+        echo "afk: $ISSUE_ID not finished on '$ITER_RUN_MODEL' — leaving open to retry at '$(model_for_attempt "$next_attempt")' (attempt $((next_attempt + 1))/$MAX_ATTEMPTS)." >&2
+        # Issue stays 'open' → pick_next_issue re-selects it next iteration.
+      else
+        echo "afk: $ISSUE_ID exhausted the escalation ladder ($MAX_ATTEMPTS attempts) — marking 'stuck'." >&2
+        awk '
+          BEGIN{in_fm=0; done=0}
+          /^---$/{in_fm = !in_fm; print; next}
+          in_fm && !done && /^status:/{print "status: stuck"; done=1; next}
+          {print}
+        ' "$next_issue" > "$next_issue.tmp" && mv "$next_issue.tmp" "$next_issue"
+      fi
+    else
+      # Default (no escalation): one shot, then stuck so the loop moves on.
+      echo "afk: warning — $(basename "$next_issue") still '$status_after' after iteration $iter." >&2
+      echo "afk: marking it 'stuck' so the loop moves on." >&2
+      awk '
+        BEGIN{in_fm=0; done=0}
+        /^---$/{in_fm = !in_fm; print; next}
+        in_fm && !done && /^status:/{print "status: stuck"; done=1; next}
+        {print}
+      ' "$next_issue" > "$next_issue.tmp" && mv "$next_issue.tmp" "$next_issue"
+    fi
+  fi
+
+  # On success, clear this issue's escalation attempt state.
+  if [ -n "$ESCALATE" ] && [ "$status_after" = "done" ]; then
+    rm -f "$ESCALATION_DIR/$ISSUE_ID"
   fi
 
   ITERS_DONE=$((ITERS_DONE + 1))
