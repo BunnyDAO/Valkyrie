@@ -18,7 +18,7 @@ human checkpoints; where it helps, delegate a slice's actual implementation or a
 **single-task sonnet/haiku sub-agent** (Agent tool) and bring back just the result, to keep the
 main thread lean. If a delegated attempt fails QA ~twice, **escalate the sub-agent's model one
 tier** (haiku → sonnet → opus) rather than grinding on the cheap tier — opus is the ceiling,
-then surface to the human. (`afk --escalate` automates this per issue.) See `valk` →
+then surface to the human. (`afk` automates this per issue by default; `--no-escalate` to opt out.) See `valk` →
 "Delegation & cost discipline".
 
 ## Philosophy

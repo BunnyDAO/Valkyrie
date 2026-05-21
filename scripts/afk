@@ -18,18 +18,20 @@
 #
 # Usage:
 #   afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
-#                        [--escalate [--escalate-ladder "haiku sonnet opus"]
-#                                    [--escalate-tries N]]
+#                        [--no-escalate | --escalate-ladder "haiku sonnet opus"
+#                                       | --escalate-tries N]
 #
 # Examples:
 #   afk 10                       # 10 iterations using claude (default)
-#   afk 10 --cli codex           # same but using codex
+#   afk 10 --cli codex           # same but using codex (escalation N/A)
 #   afk 5 --prompt-file pm.md    # override the per-iteration prompt
-#   afk 10 --escalate            # on a failing issue, retry at a higher model
-#                                #   tier before giving up (haiku→sonnet→opus).
-#                                #   claude only. Each attempt is one iteration
-#                                #   (counts against caps). Default 1 try/tier;
-#                                #   --escalate-tries 2 gives two shots per tier.
+#   afk 10 --no-escalate         # one shot per issue (disable escalation)
+#
+# Model escalation is ON by default (claude only): a failing issue is retried at
+# a higher model tier before being marked stuck (haiku→sonnet→opus). Each attempt
+# is one iteration (counts against caps). Default 1 try/tier; --escalate-tries 2
+# gives two shots per tier. --no-escalate restores one-shot-per-issue behavior.
+# For --cli codex, escalation auto-disables (the ladder uses claude aliases).
 
 set -euo pipefail
 
@@ -45,7 +47,7 @@ ALLOW_NO_PRD=""
 ALLOW_DIRTY=""
 ALLOW_DANGEROUS=""
 NO_CONFIRM=""
-ESCALATE=""
+ESCALATE="1"   # on by default (claude only); disable with --no-escalate
 ESCALATE_LADDER="haiku sonnet opus"
 ESCALATE_TRIES="1"
 
@@ -57,6 +59,8 @@ while [ $# -gt 0 ]; do
       PROMPT_FILE="$2"; shift 2 ;;
     --escalate)
       ESCALATE="1"; shift ;;
+    --no-escalate)
+      ESCALATE=""; shift ;;
     --escalate-ladder)
       ESCALATE_LADDER="$2"; shift 2 ;;
     --escalate-tries)
@@ -94,7 +98,7 @@ if [ -n "$DEBUG_COST" ]; then
 fi
 
 if [ -z "$MAX_ITERS" ]; then
-  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>] [--escalate [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]]" >&2
+  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>] [--no-escalate] [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]" >&2
   exit 2
 fi
 if ! [[ "$MAX_ITERS" =~ ^[0-9]+$ ]]; then
@@ -117,15 +121,18 @@ if ! command -v "$CLI" >/dev/null 2>&1; then
 fi
 
 # --- escalation setup -------------------------------------------------------
-# Opt-in (--escalate): on a failed issue, retry it at the next model tier
-# before marking it stuck. claude-only — the ladder uses claude model aliases.
+# ON by default (claude only); --no-escalate turns it off. On a failed issue,
+# retry it at the next model tier before marking it stuck. The ladder uses
+# claude model aliases, so for any other CLI escalation is auto-disabled with a
+# warning rather than erroring (so default-on never breaks codex runs).
 LADDER_ARR=()
 LADDER_LEN=0
 MAX_ATTEMPTS=0
+if [ -n "$ESCALATE" ] && [ "$CLI" != "claude" ]; then
+  echo "afk: escalation is claude-only (the ladder uses claude model aliases) — disabled for --cli $CLI" >&2
+  ESCALATE=""
+fi
 if [ -n "$ESCALATE" ]; then
-  if [ "$CLI" != "claude" ]; then
-    echo "--escalate requires --cli claude (the ladder uses claude model aliases)" >&2; exit 2
-  fi
   if ! [[ "$ESCALATE_TRIES" =~ ^[0-9]+$ ]] || [ "$ESCALATE_TRIES" -lt 1 ]; then
     echo "--escalate-tries must be a positive integer (got: $ESCALATE_TRIES)" >&2; exit 2
   fi

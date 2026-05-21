@@ -50,8 +50,8 @@ expensive model only on coordination and the human-in-the-loop gates.
 - **Escalate on failure; don't open expensive.** Start a delegated task on a cheap tier; if it
   fails ~twice, bump one tier (**haiku → sonnet → opus**), with opus the ceiling — then surface
   to the human. Pick the *starting* tier by task type (haiku for reads/simple QA, sonnet for
-  most coding); starting too low can cost more in retries than starting a tier up. `afk
-  --escalate` does this mechanically, one issue at a time.
+  most coding); starting too low can cost more in retries than starting a tier up. `afk` does
+  this mechanically by default (claude only; `--no-escalate` to opt out), one issue at a time.
 
 This is honor-based guidance (a hook can't force a sub-agent spawn), but it's the difference
 between a lean orchestrator and a bloated, expensive main thread. (`afk` already embodies it —

@@ -65,7 +65,8 @@ MODEL_LOG="$WORKDIR/models.log"
 
 cd "$WORKDIR"
 export MODEL_LOG
-PATH="$STUB_DIR:$PATH" "$AFK" 5 --no-confirm --escalate >"$WORKDIR/run.out" 2>&1
+# No --escalate flag: escalation must be ON by default.
+PATH="$STUB_DIR:$PATH" "$AFK" 5 --no-confirm >"$WORKDIR/run.out" 2>&1
 RC=$?
 
 FAILS=0
@@ -88,12 +89,37 @@ grep -q '^status: stuck' "$WORKDIR/issues/0001-fails.md" || fail "issue not mark
 # 5. Escalation log mentions exhausting the ladder.
 grep -q 'exhausted the escalation ladder' "$WORKDIR/run.out" || fail "no 'exhausted ladder' message"
 
-# --- guard: --escalate requires --cli claude --------------------------------
+# --- guard: codex auto-disables escalation (claude-only) and still runs ------
+# Default-on escalation must NOT break codex: it warns, disables, and exits 0.
 cd "$WORKDIR"
-PATH="$REPO_STUBS:$PATH" "$AFK" 1 --no-confirm --escalate --cli codex >"$WORKDIR/guard.out" 2>&1
+PATH="$REPO_STUBS:$PATH" "$AFK" 1 --no-confirm --cli codex >"$WORKDIR/guard.out" 2>&1
 GRC=$?
-[ "$GRC" -ne 0 ] || fail "--escalate --cli codex should have failed"
-grep -q 'requires --cli claude' "$WORKDIR/guard.out" || fail "missing claude-only guard message"
+[ "$GRC" -eq 0 ] || { fail "--cli codex run should exit 0 (got $GRC)"; cat "$WORKDIR/guard.out"; }
+grep -q 'escalation is claude-only' "$WORKDIR/guard.out" || fail "missing codex escalation-disabled warning"
+
+# --- guard: --no-escalate is one shot per issue (no model flag, then stuck) --
+# Fresh failing issue + the model-recording stub. --no-escalate => one attempt,
+# NO --model passed, issue immediately stuck (the old default behavior).
+NOESC_LOG="$WORKDIR/noesc.log"; : > "$NOESC_LOG"
+cat > "$WORKDIR/issues/0002-fails.md" <<'ISSUE'
+---
+id: 0002
+title: Also-fails slice
+type: AFK
+status: open
+blocked_by: []
+---
+
+## Acceptance criteria
+- [ ] never satisfied by the stub
+ISSUE
+cd "$WORKDIR"
+MODEL_LOG="$NOESC_LOG" PATH="$STUB_DIR:$PATH" "$AFK" 3 --no-confirm --no-escalate >"$WORKDIR/noesc.out" 2>&1
+NRC=$?
+[ "$NRC" -eq 0 ] || { fail "--no-escalate run should exit 0 (got $NRC)"; cat "$WORKDIR/noesc.out"; }
+grep -q '^status: stuck' "$WORKDIR/issues/0002-fails.md" || fail "--no-escalate: 0002 not marked stuck"
+grep -q '<none>' "$NOESC_LOG" || fail "--no-escalate: expected no --model passed (<none>)"
+grep -qE '^(haiku|sonnet|opus)$' "$NOESC_LOG" && fail "--no-escalate: a model tier was passed (should be none)"
 
 if [ "$FAILS" -eq 0 ]; then
   echo "test-escalate: all assertions passed"

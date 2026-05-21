@@ -247,9 +247,11 @@ three stages:
   result, so the main thread's context stays small. `/valk` and the stage skills nudge this;
   `afk` already runs one fresh single-issue session per slice.
 - **Escalate instead of starting expensive.** Begin delegated work on a cheap tier; on repeated
-  failure bump one tier — **haiku → sonnet → opus** (opus the ceiling, then a human). Run it
-  hands-off with `afk --escalate`, which retries a failing issue at the next tier per iteration
-  before marking it stuck (`--escalate-tries N` for N shots per tier; default 1).
+  failure bump one tier — **haiku → sonnet → opus** (opus the ceiling, then a human). `afk` does
+  this **by default** (claude only): it retries a failing issue at the next tier per iteration
+  before marking it stuck. Tune with `--escalate-tries N` (N shots per tier, default 1) or
+  `--escalate-ladder "…"`; disable with `--no-escalate`. (Each attempt is one iteration, so it
+  counts against the caps.)
 - **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
   prints the independent batches; spin up a `valk-worktree` per batch to run them concurrently,
   then `valk-land` each back. (Sequential alternative: `afk N`.)

@@ -240,8 +240,9 @@ conversation and markdown. So don't pay the strongest model for them:
   so the main thread's context stays small. `/valk` and the stage skills are wired to nudge
   this, and `afk` already runs one fresh single-issue session per slice.
 - **Escalate, don't open expensive.** Start delegated work on a cheap tier and bump only on
-  repeated failure — **haiku → sonnet → opus**, opus the ceiling, then a human. `afk --escalate`
-  does this mechanically per issue (retries a failing issue at the next tier before giving up).
+  repeated failure — **haiku → sonnet → opus**, opus the ceiling, then a human. `afk` does this
+  mechanically per issue **by default** (claude only) — retrying a failing issue at the next tier
+  before giving up. Turn it off with `afk --no-escalate`.
 - **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
   emits a batch plan; run each independent batch in its own `valk-worktree` to work concurrently
   (integrate back with `valk-land`).
