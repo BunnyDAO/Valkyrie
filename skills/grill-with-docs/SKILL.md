@@ -112,7 +112,14 @@ Stop when:
 - The user has answered a question with "I don't care, you decide" twice in a row (decision fatigue — they're done designing)
 - The user explicitly says "ok, that's enough, write it up"
 
-When you stop, summarize the resolved decisions in 5–10 bullets. If you wrote anything into `CONTEXT.md` or `docs/adr/` during the session, list those file paths too. Then say:
+When you stop, summarize the session in chat — terse, decision-only.
+
+- **Decisions** (5–10 bullets, each ≤ one line): `<decision> — <one-line why>`. Skip exploration; only resolved choices.
+- **Docs updated** (paths only): `CONTEXT.md` if you wrote to it, plus any `docs/adr/*.md` files you created.
+
+Total: under 200 words. Do NOT recap the conversation, restate the user's questions, or narrate the grilling process — the user lived it; they don't need a transcript.
+
+Then say:
 
 > "Ready to turn this into a PRD?"
 

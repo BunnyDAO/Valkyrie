@@ -82,28 +82,30 @@ python3 ~/.claude/valkyrie/stage.py set prd-review
 
 The statusline now shows **▶ REVIEW-PRD** — the signal that the human owes the PRD a read before anything proceeds.
 
-### 2. Surface the decisions inline — do NOT just print the path
+### 2. Surface decisions in chat — terse, decision-ready
 
-The user should not have to open a file to review. Reproduce these sections from the PRD you just wrote, verbatim, in the conversation:
+Do NOT paste large PRD sections into chat. The file holds the exhaustive content; chat holds the decision-ready summary. Emit:
 
-- **Implementation Decisions** (every bullet)
-- **Out of Scope** (every bullet)
-- **User Stories** (the 3–5 most consequential — not all of them if the list is long)
+- **Path:** `docs/prd/<slug>.md`
+- **Decisions** (≤5 bullets): the most load-bearing Implementation Decisions, each as `<decision> — <one-line why>`. Skip generic items.
+- **Out of scope** (≤3 bullets): only non-obvious exclusions.
+- **Risk / open question** (≤2 bullets): anything that could derail issue breakdown.
 
-Then state the path: "Full PRD: `docs/prd/<slug>.md`."
+Total: under 200 words. No prose paragraphs. If a section has nothing load-bearing, omit it — don't pad.
 
-### 3. Demand substantive approval
+### 3. Force engagement via AskUserQuestion
 
-Ask the user to do ONE of:
+Immediately after the summary, call `AskUserQuestion` with options built from the decisions you just surfaced:
 
-- **Approve** by confirming at least one specific decision back to you in their own words (e.g. "yes, event-sourced orders and the Postgres write model are right"), OR
-- **Redline** — name a decision to change, and what to.
+- 2–3 options of the form **"Approve: <decision-name>"** — clicking one is substantive approval. The click means "I read this rationale and I endorse it."
+- 1 option **"Redline a decision"** — pauses for the user to name which decision and what to change.
+- 1 option **"Open the file first"** — wait; do NOT proceed until they return with approve or redline.
 
-**A bare "yes", "looks good", "lgtm", "sure", "proceed", or silence is NOT approval.** If you get one, respond:
+A click on Approve satisfies the gate. A click on Redline → revise PRD → re-save → re-run from step 2.
 
-> "That's not engagement with the PRD — and an unreviewed PRD is exactly what Valkyrie exists to prevent. Tell me one decision in the Implementation Decisions or Out of Scope list that you agree with or want changed, in your own words. Then we proceed."
+If the user replies in prose instead of clicking, it still must name a specific decision (approve or redline). A bare "yes" / "lgtm" / "proceed" is NOT approval. Respond:
 
-Do not advance until the user has either confirmed a specific decision or requested a specific change. If they redline, revise the PRD, re-save, and re-run this gate from step 2.
+> "That's not engagement with the PRD. Pick an option above, or name one decision to redline. Then we proceed."
 
 ### 4. Hand back to the orchestrator
 

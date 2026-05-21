@@ -34,22 +34,22 @@ Rules:
 - A completed slice is demoable or verifiable on its own
 - Prefer many thin slices over few thick ones
 
-### 4. Quiz the user
+### 4. Surface the breakdown — terse, decision-ready
 
-Present the proposed breakdown as a numbered list. For each slice, show:
+Do NOT paste full issue bodies into chat. The files (saved in step 5) hold full content. In chat, emit ONE line per issue:
 
-- **Title** — short descriptive name
-- **Type** — HITL / AFK
-- **Blocked by** — which other slices must complete first
-- **User stories covered** — which PRD user stories this addresses
+`N. <title> [HITL|AFK] — blocked by: <ids or "none"> — covers: <user-story #s>`
 
-Ask:
-- Does the granularity feel right? (too coarse / too fine)
-- Are the dependency relationships correct?
-- Should any slices be merged or split further?
-- HITL/AFK markings correct?
+Then call `AskUserQuestion` with these options:
 
-Iterate until the user approves.
+- **Approve breakdown** — proceed to save (step 5).
+- **Split issue N** — pauses for the user to name which and how.
+- **Merge issues N+M** — pauses for the user to name which.
+- **Resequence / flip HITL↔AFK** — pauses for the user to specify.
+
+Iterate until Approve is selected. On any other option, revise the slice list and re-surface from the top of this step.
+
+If the user replies in prose, it must name a specific change (split N, merge N+M, flip N's type) or specifically approve. A bare "yes" / "looks good" is NOT approval — ask which option above they mean.
 
 ### 5. Save the issues
 
