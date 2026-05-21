@@ -259,6 +259,22 @@ To make it the default for **every** session (not just Valkyrie workflows), drop
 - Give each background agent a single task to limit its context overhead.
 ```
 
+### AFK audit log
+
+Unattended runs leave a trail. While a Valkyrie stage is active, a `PostToolUse` hook records
+every file Read/Edit (path + line count) to `.claude/valk/telemetry/<session>.jsonl`, and `afk`
+prints a per-iteration + end-of-run summary:
+
+```
+telemetry: 14 files / 2,341 lines crawled | 2 edited without reading
+```
+
+**"edited without reading"** is a proxy for inference — a file the agent changed but never
+opened that session. Worth an eyeball, not proof of a bug. It only logs during active stages
+(idle/ad-hoc sessions stay clean), and it records the *tool-call trail*, not the model's
+reasoning (chain-of-thought isn't observable). Real-time drift alarms are intentionally **not**
+built — this is a post-hoc audit layer.
+
 ### Escape hatches
 
 - `/zoom-out` — when you're lost in unfamiliar code

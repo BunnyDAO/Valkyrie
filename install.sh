@@ -70,11 +70,13 @@ echo "  + $PM_DIR/statusline.py"
 echo "  + $PM_DIR/stage.py"
 
 echo "==> installing cost helper + rate table into $PM_DIR"
-cp "$REPO/scripts/cost-helper.py" "$PM_DIR/cost-helper.py"
-cp "$REPO/scripts/rates.json"     "$PM_DIR/rates.json"
-cp "$REPO/scripts/crew-shim"      "$PM_DIR/crew-shim"
-chmod +x "$PM_DIR/cost-helper.py" "$PM_DIR/crew-shim"
+cp "$REPO/scripts/cost-helper.py"      "$PM_DIR/cost-helper.py"
+cp "$REPO/scripts/telemetry-helper.py" "$PM_DIR/telemetry-helper.py"
+cp "$REPO/scripts/rates.json"          "$PM_DIR/rates.json"
+cp "$REPO/scripts/crew-shim"           "$PM_DIR/crew-shim"
+chmod +x "$PM_DIR/cost-helper.py" "$PM_DIR/telemetry-helper.py" "$PM_DIR/crew-shim"
 echo "  + $PM_DIR/cost-helper.py"
+echo "  + $PM_DIR/telemetry-helper.py"
 echo "  + $PM_DIR/rates.json"
 echo "  + $PM_DIR/crew-shim"
 
@@ -98,6 +100,12 @@ cp "$REPO/scripts/valk-tdd-gate.sh" "$HOOKS_DIR/valk-tdd-gate.sh"
 chmod +x "$HOOKS_DIR/valk-tdd-gate.sh"
 echo "  + $HOOKS_DIR/valk-tdd-gate.sh"
 
+# PostToolUse telemetry: the lean AFK audit log (files/lines, edit-without-read).
+# Stage-gated and self-contained, so no --target re-point is needed.
+cp "$REPO/scripts/valk-telemetry.sh" "$HOOKS_DIR/valk-telemetry.sh"
+chmod +x "$HOOKS_DIR/valk-telemetry.sh"
+echo "  + $HOOKS_DIR/valk-telemetry.sh"
+
 # --- 4. patch settings.json -------------------------------------------------
 
 echo "==> wiring statusline + hook into $SETTINGS"
@@ -116,6 +124,7 @@ settings_path = Path("$SETTINGS")
 # target-scoped paths; for the default global install this is ~/.claude.
 hook_path = "$CLAUDE_HOME/hooks/valk-guard.sh"
 gate_path = "$CLAUDE_HOME/hooks/valk-tdd-gate.sh"
+telemetry_path = "$CLAUDE_HOME/hooks/valk-telemetry.sh"
 statusline_path = "$CLAUDE_HOME/valkyrie/statusline.py"
 
 # On Windows, convert to Git Bash format (/c/Users/... instead of C:Users...)
@@ -123,6 +132,7 @@ if sys.platform == 'win32' and len(hook_path) > 2 and hook_path[1] == ':':
     # Convert C:Users... to /c/Users/... (using chr(92) for backslash to avoid escaping issues)
     hook_path = '/' + hook_path[0].lower() + hook_path[2:].replace(chr(92), '/')
     gate_path = '/' + gate_path[0].lower() + gate_path[2:].replace(chr(92), '/')
+    telemetry_path = '/' + telemetry_path[0].lower() + telemetry_path[2:].replace(chr(92), '/')
     statusline_path = '/' + statusline_path[0].lower() + statusline_path[2:].replace(chr(92), '/')
 data = {}
 if settings_path.exists() and settings_path.stat().st_size > 0:
@@ -163,6 +173,18 @@ if not gate_wired:
         "hooks": [{"type": "command", "command": gate_path}],
     })
 
+# Merge the PostToolUse telemetry hook the same idempotent way.
+post = hooks.setdefault("PostToolUse", [])
+telem_wired = any(
+    any(h.get("command") == telemetry_path for h in entry.get("hooks", []))
+    for entry in post if isinstance(entry, dict)
+)
+if not telem_wired:
+    post.append({
+        "matcher": "Read|Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [{"type": "command", "command": telemetry_path}],
+    })
+
 # Ensure parent directory exists (important for Windows)
 settings_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -171,6 +193,7 @@ try:
     print(f"  + statusLine -> python3 {statusline_path}")
     print(f"  + UserPromptSubmit hook -> {hook_path}")
     print(f"  + PreToolUse TDD gate -> {gate_path}")
+    print(f"  + PostToolUse telemetry -> {telemetry_path}")
 except Exception as e:
     print(f"  ✗ Failed to write settings.json: {e}", file=sys.stderr)
     sys.exit(1)

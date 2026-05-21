@@ -45,12 +45,14 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 | Statusline + stage helper | `~/.claude/valkyrie/{statusline.py,stage.py}` | Global | Renders the ▶ STAGE pill; reads/writes the stage file. |
 | UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Soft-start enforcement — nudges build prompts into `/valk`. See §2. |
 | PreToolUse TDD gate | `~/.claude/hooks/valk-tdd-gate.sh` | Global, runs on edit/Bash tool calls | Hard wall — mechanically blocks production-code edits before TDD. See §2. |
+| PostToolUse telemetry | `~/.claude/hooks/valk-telemetry.sh` | Global, runs on file tool calls | The AFK audit log — records file Read/Edit during active stages. See §7. |
 | Settings glue | `~/.claude/settings.json` | Global | Wires the statusline + hook. Patched in place. |
 | Stage marker | `<repo>/.claude/valk/stage` | Per-project | Current workflow stage. Each repo tracks its own. |
 | AFK logs | `<repo>/.claude/valk/afk-logs/` | Per-project | One log file per `afk` iteration. |
 | PRDs | `<repo>/docs/prd/<slug>.md` | Per-project | Output of `/to-prd`. |
 | Issues | `<repo>/issues/0001-*.md` | Per-project | Output of `/to-issues`. Vertical slices with frontmatter. |
 | Domain/intent docs (optional) | `<repo>/DOMAIN.md`, `<repo>/PRODUCT-MAP.md`, `<repo>/docs/intent/*.md` | Per-project | Output of `/to-domain`, `/to-product-map`, `/to-intent`. No-op if absent. |
+| Telemetry (AFK audit log) | `<repo>/.claude/valk/telemetry/<session>.jsonl` | Per-project | File Read/Edit trail per session. See §7. |
 | `afk` binary | `~/.local/bin/afk` → repo | Global | The autonomous loop. Run from any project directory. |
 
 **What's accessible from any directory:** the slash commands (`/valk`, `/grill-with-docs`, etc.), the hook, the statusline, the `afk` binary. **What's project-local:** the stage marker, AFK logs, PRDs, issues. That separation is intentional — you can have two repos in different stages at once without them clobbering each other.
@@ -514,6 +516,27 @@ The file accumulates across runs (header on first creation, append thereafter). 
 6. **Repeat** until: max iterations hit, no unblocked issues left, or you Ctrl-C.
 
 When the loop ends (any reason), the stage is cleared back to idle.
+
+### The AFK audit log (telemetry)
+
+Because no human watches an AFK run, it leaves a trail you can review afterward. While a
+Valkyrie stage is active, a `PostToolUse` hook (`valk-telemetry.sh`) records every file
+Read/Edit (path + line count) to `<repo>/.claude/valk/telemetry/<session>.jsonl`. After each
+iteration — and in the final banner — `afk` summarizes it:
+
+```
+telemetry: 14 files / 2,341 lines crawled | 2 edited without reading
+```
+
+- **"edited without reading"** is a proxy for inference: the agent changed a file it never
+  opened that session. It's a signal to eyeball in review, not proof of a bug.
+- It records the **tool-call trail, not the model's reasoning** — chain-of-thought isn't
+  observable to hooks. Don't read more into it than "what files did it touch, and did it look
+  before it leapt."
+- It only logs during **active stages**, so idle/ad-hoc sessions don't generate noise.
+- This is a **post-hoc audit** layer by design — there are deliberately no real-time drift
+  alarms (they'd be fuzzy and noisy). Review the JSONL or the run summary; for deeper auditing
+  the integration suite's `trace.jsonl` still captures full tool traces.
 
 ### Watching it run / interrupting
 

@@ -201,6 +201,12 @@ ITERS_COST_ESTIMATED=0
 CUMULATIVE_TOKENS=0
 RUN_COST_MODE="dollars"
 COST_HELPER="$HOME/.claude/valkyrie/cost-helper.py"
+# Telemetry (lean AFK audit log): the PostToolUse hook writes per-session JSONL;
+# this helper summarizes it. RUN_TELEM_SEEN flips on once any iteration had
+# telemetry, so the summary only mentions it when it's real.
+TELEMETRY_HELPER="${VALK_TELEMETRY_HELPER:-$HOME/.claude/valkyrie/telemetry-helper.py}"
+RUN_TELEM_UNREAD=0
+RUN_TELEM_SEEN=0
 CSV_HEADER='timestamp,iter,model,input_tokens,output_tokens,cache_write_5m,cache_write_1h,cache_read,cost_usd,cumulative_usd,cost_source,pr_url,exit_reason_for_run'
 
 # --- helpers ----------------------------------------------------------------
@@ -521,6 +527,10 @@ print_summary() {
   fi
   printf "  issues done:   %d\n"        "$done_n"
   printf "  issues stuck:  %d\n"        "$stuck_n"
+  if [ "$RUN_TELEM_SEEN" -eq 1 ]; then
+    printf "  edits w/o read:%d  (proxy for inference — eyeball these)\n" "$RUN_TELEM_UNREAD"
+    printf "  telemetry:     %s\n" ".claude/valk/telemetry/"
+  fi
   printf "  logs:          %s\n"        ".claude/valk/afk-logs/"
   printf "  cost history:  %s\n"        ".claude/valk/afk-cost-history.csv"
 }
@@ -830,6 +840,24 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   fi
 
   ITERS_DONE=$((ITERS_DONE + 1))
+
+  # Telemetry summary for this iteration's session (if the PostToolUse hook
+  # logged file activity). "edited without reading" is a proxy for inference:
+  # a file changed but never opened this session — worth an eyeball, not proof.
+  SESSION_ID="$(grep -o '"session_id":"[^"]*"' "$logfile" 2>/dev/null | head -1 | sed 's/.*:"//; s/"$//')"
+  TELEM_FILE="$REPO/.claude/valk/telemetry/$SESSION_ID.jsonl"
+  if [ -n "$SESSION_ID" ] && [ -f "$TELEM_FILE" ] && [ -f "$TELEMETRY_HELPER" ]; then
+    TELEM_OUT="$(python3 "$TELEMETRY_HELPER" summarize "$TELEM_FILE" 2>/dev/null || true)"
+    if [ -n "$TELEM_OUT" ]; then
+      T_FILES="$(printf '%s' "$TELEM_OUT" | sed -n 's/.*files=\([0-9]*\).*/\1/p')"
+      T_LINES="$(printf '%s' "$TELEM_OUT" | sed -n 's/.*lines=\([0-9]*\).*/\1/p')"
+      T_UNREAD="$(printf '%s' "$TELEM_OUT" | sed -n 's/.*edit_without_read=\([0-9]*\).*/\1/p')"
+      printf 'telemetry: %s files / %s lines crawled | %s edited without reading\n' \
+        "${T_FILES:-0}" "${T_LINES:-0}" "${T_UNREAD:-0}"
+      RUN_TELEM_UNREAD=$(( RUN_TELEM_UNREAD + ${T_UNREAD:-0} ))
+      RUN_TELEM_SEEN=1
+    fi
+  fi
 
   # Per-iteration cumulative status line.
   ELAPSED=$(( $(date +%s) - START_TS ))
