@@ -246,12 +246,13 @@ three stages:
   code-writing/QA (TDD) to **single-task sonnet/haiku sub-agents** and pull back only the
   result, so the main thread's context stays small. `/valk` and the stage skills nudge this;
   `afk` already runs one fresh single-issue session per slice.
-- **Escalate instead of starting expensive.** Begin delegated work on a cheap tier; on repeated
-  failure bump one tier — **haiku → sonnet → opus** (opus the ceiling, then a human). `afk` does
-  this **by default** (claude only): it retries a failing issue at the next tier per iteration
-  before marking it stuck. Tune with `--escalate-tries N` (N shots per tier, default 1) or
-  `--escalate-ladder "…"`; disable with `--no-escalate`. (Each attempt is one iteration, so it
-  counts against the caps.)
+- **Escalate instead of starting expensive.** On repeated failure bump one tier (full order
+  **haiku → sonnet → opus**, opus the ceiling, then a human). `afk` does this **by default**
+  (claude only): it retries a failing issue at the next tier per iteration before marking it
+  stuck. Its default ladder is **sonnet → opus** (afk writes code); pass
+  `--escalate-ladder "haiku sonnet opus"` to start cheaper for read/QA-heavy work. Tune shots
+  per tier with `--escalate-tries N` (default 1); disable with `--no-escalate`. (Each attempt is
+  one iteration — counts against the caps.)
 - **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
   prints the independent batches; spin up a `valk-worktree` per batch to run them concurrently,
   then `valk-land` each back. (Sequential alternative: `afk N`.)

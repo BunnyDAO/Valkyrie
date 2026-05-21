@@ -239,10 +239,12 @@ conversation and markdown. So don't pay the strongest model for them:
   code-writing/QA to **single-task sonnet/haiku sub-agents**, pulling back only the result —
   so the main thread's context stays small. `/valk` and the stage skills are wired to nudge
   this, and `afk` already runs one fresh single-issue session per slice.
-- **Escalate, don't open expensive.** Start delegated work on a cheap tier and bump only on
-  repeated failure — **haiku → sonnet → opus**, opus the ceiling, then a human. `afk` does this
-  mechanically per issue **by default** (claude only) — retrying a failing issue at the next tier
-  before giving up. Turn it off with `afk --no-escalate`.
+- **Escalate, don't open expensive.** On repeated failure, bump one tier — the full ladder is
+  **haiku → sonnet → opus** (opus the ceiling, then a human). `afk` does this mechanically per
+  issue **by default** (claude only), retrying a failing issue at the next tier before giving up.
+  Its default ladder is **sonnet → opus** (afk writes code, so haiku-first just churns); pass
+  `--escalate-ladder "haiku sonnet opus"` to start cheaper for read/QA-heavy work, or
+  `--no-escalate` to turn it off.
 - **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
   emits a batch plan; run each independent batch in its own `valk-worktree` to work concurrently
   (integrate back with `valk-land`).

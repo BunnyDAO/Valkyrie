@@ -28,9 +28,10 @@
 #   afk 10 --no-escalate         # one shot per issue (disable escalation)
 #
 # Model escalation is ON by default (claude only): a failing issue is retried at
-# a higher model tier before being marked stuck (haiku→sonnet→opus). Each attempt
-# is one iteration (counts against caps). Default 1 try/tier; --escalate-tries 2
-# gives two shots per tier. --no-escalate restores one-shot-per-issue behavior.
+# a higher model tier before being marked stuck. Default ladder is sonnet→opus
+# (afk writes code); pass --escalate-ladder "haiku sonnet opus" to start cheaper.
+# Each attempt is one iteration (counts against caps). Default 1 try/tier;
+# --escalate-tries 2 gives two shots per tier. --no-escalate restores one-shot.
 # For --cli codex, escalation auto-disables (the ladder uses claude aliases).
 
 set -euo pipefail
@@ -48,7 +49,10 @@ ALLOW_DIRTY=""
 ALLOW_DANGEROUS=""
 NO_CONFIRM=""
 ESCALATE="1"   # on by default (claude only); disable with --no-escalate
-ESCALATE_LADDER="haiku sonnet opus"
+# afk writes code (TDD), so the default starts at sonnet — haiku-first usually
+# just burns an attempt before sonnet does it anyway. Use --escalate-ladder
+# "haiku sonnet opus" to start cheaper (good for read/QA-heavy work).
+ESCALATE_LADDER="sonnet opus"
 ESCALATE_TRIES="1"
 
 while [ $# -gt 0 ]; do

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 #
-# test-escalate.sh — afk --escalate per-issue model escalation.
+# test-escalate.sh — afk model escalation (on by default).
 #
 # Uses a custom `claude` stub that (a) records the --model afk passed and
-# (b) never marks the issue done. Asserts afk walks the ladder
-# haiku→sonnet→opus across attempts, then marks the issue stuck once the
-# ladder is exhausted — and that --escalate is rejected with --cli codex.
+# (b) never marks the issue done. Asserts:
+#   - default (no flags): escalation walks the DEFAULT ladder sonnet→opus, then stuck
+#   - --escalate-ladder "haiku sonnet opus": walks all three tiers, then stuck
+#   - --cli codex: escalation auto-disables with a warning, run still exits 0
+#   - --no-escalate: one shot, no --model passed, issue stuck immediately
 
 set -u
 
@@ -47,7 +49,11 @@ chmod +x "$STUB_DIR/claude"
 # --- fixture repo -----------------------------------------------------------
 mkdir -p "$WORKDIR/issues" "$WORKDIR/docs/prd"
 echo "stub PRD" > "$WORKDIR/docs/prd/dummy.md"
-cat > "$WORKDIR/issues/0001-fails.md" <<'ISSUE'
+
+# (Re)create the single failing issue as status: open. Called before each run so
+# pick_next_issue selects it fresh.
+reset_issue() {
+  cat > "$WORKDIR/issues/0001-fails.md" <<'ISSUE'
 ---
 id: 0001
 title: Always-fails slice
@@ -59,67 +65,57 @@ blocked_by: []
 ## Acceptance criteria
 - [ ] never satisfied by the stub
 ISSUE
-
-MODEL_LOG="$WORKDIR/models.log"
-: > "$MODEL_LOG"
+  # Clear any escalation attempt state from a prior run.
+  rm -rf "$WORKDIR/.claude/valk/afk-escalation"
+}
 
 cd "$WORKDIR"
-export MODEL_LOG
-# No --escalate flag: escalation must be ON by default.
-PATH="$STUB_DIR:$PATH" "$AFK" 5 --no-confirm >"$WORKDIR/run.out" 2>&1
-RC=$?
 
 FAILS=0
 fail() { echo "FAIL: $1"; FAILS=$((FAILS + 1)); }
 
-# 1. Clean exit.
-[ "$RC" -eq 0 ] || { fail "afk exit code $RC (expected 0)"; cat "$WORKDIR/run.out"; }
+# Run afk with the failing stub; $1 = MODEL_LOG path, rest = extra afk args.
+run_afk() {
+  local log="$1"; shift
+  : > "$log"
+  MODEL_LOG="$log" PATH="$STUB_DIR:$PATH" "$AFK" 6 --no-confirm "$@" >"$WORKDIR/run.out" 2>&1
+}
 
-# 2. The ladder was walked in order: haiku, sonnet, opus (one line each).
-GOT="$(tr '\n' ' ' < "$MODEL_LOG" | sed 's/ *$//')"
-[ "$GOT" = "haiku sonnet opus" ] || fail "model ladder was '$GOT' (expected 'haiku sonnet opus')"
+# --- 1. DEFAULT ladder (no flags) → sonnet, opus, then stuck ----------------
+reset_issue
+run_afk "$WORKDIR/default.log"
+RC=$?
+[ "$RC" -eq 0 ] || { fail "default run exit $RC (expected 0)"; cat "$WORKDIR/run.out"; }
+GOT="$(tr '\n' ' ' < "$WORKDIR/default.log" | sed 's/ *$//')"
+[ "$GOT" = "sonnet opus" ] || fail "default ladder was '$GOT' (expected 'sonnet opus')"
+grep -q '^status: stuck' "$WORKDIR/issues/0001-fails.md" || fail "default: issue not marked stuck"
 
-# 3. Exactly 3 attempts (MAX_ATTEMPTS = 3 tiers x 1 try), no 4th.
-N="$(wc -l < "$MODEL_LOG" | tr -d ' ')"
-[ "$N" -eq 3 ] || fail "expected 3 attempts, got $N"
+# --- 2. EXPLICIT 3-tier ladder → haiku, sonnet, opus, then stuck ------------
+reset_issue
+run_afk "$WORKDIR/explicit.log" --escalate-ladder "haiku sonnet opus"
+GOT="$(tr '\n' ' ' < "$WORKDIR/explicit.log" | sed 's/ *$//')"
+[ "$GOT" = "haiku sonnet opus" ] || fail "explicit ladder was '$GOT' (expected 'haiku sonnet opus')"
+grep -q '^status: stuck' "$WORKDIR/issues/0001-fails.md" || fail "explicit: issue not marked stuck"
 
-# 4. Issue ended 'stuck' after exhausting the ladder.
-grep -q '^status: stuck' "$WORKDIR/issues/0001-fails.md" || fail "issue not marked stuck"
-
-# 5. Escalation log mentions exhausting the ladder.
-grep -q 'exhausted the escalation ladder' "$WORKDIR/run.out" || fail "no 'exhausted ladder' message"
-
-# --- guard: codex auto-disables escalation (claude-only) and still runs ------
-# Default-on escalation must NOT break codex: it warns, disables, and exits 0.
-cd "$WORKDIR"
+# --- 3. codex auto-disables escalation (claude-only), warns, exits cleanly ---
+# Leave 0001 'stuck' from step 2 so there's no open issue: the run exits 0 via
+# "no more issues" without entering the codex+cost path (orthogonal to this
+# test). The escalation-disabled warning is printed during setup regardless.
 PATH="$REPO_STUBS:$PATH" "$AFK" 1 --no-confirm --cli codex >"$WORKDIR/guard.out" 2>&1
 GRC=$?
 [ "$GRC" -eq 0 ] || { fail "--cli codex run should exit 0 (got $GRC)"; cat "$WORKDIR/guard.out"; }
 grep -q 'escalation is claude-only' "$WORKDIR/guard.out" || fail "missing codex escalation-disabled warning"
 
-# --- guard: --no-escalate is one shot per issue (no model flag, then stuck) --
-# Fresh failing issue + the model-recording stub. --no-escalate => one attempt,
-# NO --model passed, issue immediately stuck (the old default behavior).
-NOESC_LOG="$WORKDIR/noesc.log"; : > "$NOESC_LOG"
-cat > "$WORKDIR/issues/0002-fails.md" <<'ISSUE'
----
-id: 0002
-title: Also-fails slice
-type: AFK
-status: open
-blocked_by: []
----
-
-## Acceptance criteria
-- [ ] never satisfied by the stub
-ISSUE
-cd "$WORKDIR"
-MODEL_LOG="$NOESC_LOG" PATH="$STUB_DIR:$PATH" "$AFK" 3 --no-confirm --no-escalate >"$WORKDIR/noesc.out" 2>&1
+# --- 4. --no-escalate → one attempt, no --model passed, immediate stuck ------
+reset_issue
+run_afk "$WORKDIR/noesc.log" --no-escalate
 NRC=$?
-[ "$NRC" -eq 0 ] || { fail "--no-escalate run should exit 0 (got $NRC)"; cat "$WORKDIR/noesc.out"; }
-grep -q '^status: stuck' "$WORKDIR/issues/0002-fails.md" || fail "--no-escalate: 0002 not marked stuck"
-grep -q '<none>' "$NOESC_LOG" || fail "--no-escalate: expected no --model passed (<none>)"
-grep -qE '^(haiku|sonnet|opus)$' "$NOESC_LOG" && fail "--no-escalate: a model tier was passed (should be none)"
+[ "$NRC" -eq 0 ] || { fail "--no-escalate run should exit 0 (got $NRC)"; cat "$WORKDIR/run.out"; }
+N="$(wc -l < "$WORKDIR/noesc.log" | tr -d ' ')"
+[ "$N" -eq 1 ] || fail "--no-escalate: expected 1 attempt, got $N"
+grep -q '<none>' "$WORKDIR/noesc.log" || fail "--no-escalate: expected no --model passed (<none>)"
+grep -qE '^(haiku|sonnet|opus)$' "$WORKDIR/noesc.log" && fail "--no-escalate: a model tier was passed (should be none)"
+grep -q '^status: stuck' "$WORKDIR/issues/0001-fails.md" || fail "--no-escalate: issue not marked stuck"
 
 if [ "$FAILS" -eq 0 ]; then
   echo "test-escalate: all assertions passed"
