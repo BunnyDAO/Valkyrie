@@ -44,20 +44,60 @@ LOCAL_BIN="$HOME/.local/bin"
 mkdir -p "$SKILLS_DIR" "$PM_DIR" "$HOOKS_DIR"
 [ "$SCOPED" -eq 0 ] && mkdir -p "$LOCAL_BIN"
 
+# install_link — symlink with verify-and-copy fallback.
+#
+# Why this exists: on Git Bash (Windows) without developer mode / admin,
+# `ln -sfn` silently falls back to a directory copy that never re-syncs on
+# subsequent install.sh runs. Users end up running stale skills weeks out of
+# date with no warning. Detect via `readlink` and copy explicitly when the
+# symlink didn't take, so `install.sh` is idempotent on every platform.
+#
+# Echoes a per-target verification line (with SKILL.md byte count where
+# present) so users can confirm the install actually refreshed.
+install_link() {
+  src="$1"; target="$2"; label="$3"
+  # First-install backup: only when target exists, isn't a symlink, AND no
+  # .bak exists yet. (Our own previous copy-mode install is also a non-
+  # symlink dir — without this guard we'd accumulate .bak siblings on every
+  # re-run.)
+  if [ -e "$target" ] && [ ! -L "$target" ] && [ ! -e "${target}.bak" ]; then
+    echo "  - $label: existing non-symlink at $target — backing up to ${target}.bak"
+    mv "$target" "${target}.bak"
+  elif [ -e "$target" ] && [ ! -L "$target" ]; then
+    # Existing non-symlink + .bak already present → our previous copy-mode
+    # install. Remove so cp -R below can refresh it.
+    rm -rf "$target"
+  fi
+  ln -sfn "$src" "$target" 2>/dev/null || true
+  if [ -L "$target" ] && [ "$(readlink "$target" 2>/dev/null)" = "$src" ]; then
+    if [ -f "$target/SKILL.md" ]; then
+      sz=$(wc -c < "$target/SKILL.md" 2>/dev/null | tr -d ' ')
+      echo "  + $label -> $src (symlink, SKILL.md=${sz:-?}B)"
+    else
+      echo "  + $label -> $src (symlink)"
+    fi
+  else
+    # ln -sfn didn't produce a real symlink (Git Bash / Windows without
+    # dev mode). Wipe whatever it created and copy explicitly so the install
+    # is current; future install.sh runs re-sync via the same path.
+    rm -rf "$target" 2>/dev/null || true
+    cp -R "$src" "$target"
+    if [ -f "$target/SKILL.md" ]; then
+      sz=$(wc -c < "$target/SKILL.md" 2>/dev/null | tr -d ' ')
+      echo "  + $label -> $src (COPY mode, SKILL.md=${sz:-?}B — symlinks unavailable; re-run install.sh after pulls to re-sync)"
+    else
+      echo "  + $label -> $src (COPY mode — symlinks unavailable; re-run install.sh after pulls to re-sync)"
+    fi
+  fi
+}
+
 # --- 1. skills --------------------------------------------------------------
 
 echo "==> linking skills into $SKILLS_DIR"
 for skill_md in "$REPO"/skills/*/SKILL.md; do
   src_dir="$(dirname "$skill_md")"
   name="$(basename "$src_dir")"
-  target="$SKILLS_DIR/$name"
-
-  if [ -e "$target" ] && [ ! -L "$target" ]; then
-    echo "  - $name: existing non-symlink at $target — backing up to ${target}.bak"
-    mv "$target" "${target}.bak"
-  fi
-  ln -sfn "$src_dir" "$target"
-  echo "  + $name -> $src_dir"
+  install_link "$src_dir" "$SKILLS_DIR/$name" "$name"
 done
 
 # --- 2. statusline + stage helper ------------------------------------------
@@ -204,48 +244,24 @@ PY
 echo "==> linking afk into $LOCAL_BIN"
 chmod +x "$REPO/scripts/afk"
 for name in afk ralph-afk; do
-  target="$LOCAL_BIN/$name"
-  if [ -e "$target" ] && [ ! -L "$target" ]; then
-    echo "  - existing non-symlink $name in $LOCAL_BIN — backing up to ${target}.bak"
-    mv "$target" "${target}.bak"
-  fi
-  ln -sfn "$REPO/scripts/afk" "$target"
-  echo "  + $name -> $REPO/scripts/afk"
+  install_link "$REPO/scripts/afk" "$LOCAL_BIN/$name" "$name"
 done
 
 # valk-worktree: one-command per-flow git-worktree isolation — the cure for
 # concurrent flows on one checkout. PATH-registered exactly like afk.
 chmod +x "$REPO/scripts/valk-worktree"
-target="$LOCAL_BIN/valk-worktree"
-if [ -e "$target" ] && [ ! -L "$target" ]; then
-  echo "  - existing non-symlink valk-worktree in $LOCAL_BIN — backing up to ${target}.bak"
-  mv "$target" "${target}.bak"
-fi
-ln -sfn "$REPO/scripts/valk-worktree" "$target"
-echo "  + valk-worktree -> $REPO/scripts/valk-worktree"
+install_link "$REPO/scripts/valk-worktree" "$LOCAL_BIN/valk-worktree" "valk-worktree"
 
 # valk-land: ergonomic, race-free integrate-back companion to valk-worktree.
 # PATH-registered exactly like afk / valk-worktree.
 chmod +x "$REPO/scripts/valk-land"
-target="$LOCAL_BIN/valk-land"
-if [ -e "$target" ] && [ ! -L "$target" ]; then
-  echo "  - existing non-symlink valk-land in $LOCAL_BIN — backing up to ${target}.bak"
-  mv "$target" "${target}.bak"
-fi
-ln -sfn "$REPO/scripts/valk-land" "$target"
-echo "  + valk-land -> $REPO/scripts/valk-land"
+install_link "$REPO/scripts/valk-land" "$LOCAL_BIN/valk-land" "valk-land"
 
 # valk-revisit: loop-back — record a mid-stream requirement change + rewind
 # the stage. The orchestrator (/valk) detects changes and calls this on
 # confirm; users can also invoke it directly. PATH-registered like the rest.
 chmod +x "$REPO/scripts/valk-revisit"
-target="$LOCAL_BIN/valk-revisit"
-if [ -e "$target" ] && [ ! -L "$target" ]; then
-  echo "  - existing non-symlink valk-revisit in $LOCAL_BIN — backing up to ${target}.bak"
-  mv "$target" "${target}.bak"
-fi
-ln -sfn "$REPO/scripts/valk-revisit" "$target"
-echo "  + valk-revisit -> $REPO/scripts/valk-revisit"
+install_link "$REPO/scripts/valk-revisit" "$LOCAL_BIN/valk-revisit" "valk-revisit"
 
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
