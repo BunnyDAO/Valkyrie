@@ -166,7 +166,46 @@ When all acceptance criteria are checked off:
 
    The message still references the issue id (e.g.
    `feat: add billing dashboard (#0003)`).
-2. **Read the repo's `.claude/valk-config.md`** to decide what "done" means:
+
+2. **Manual test gate.** Before any flip to `status: done`, read the issue file
+   and look for a `## Manual test checklist` section. Unit tests don't cover
+   interaction quality — a real trial run shipped a UX that needed substantive
+   rework once a human actually used the app (the original click-and-drag was
+   wrong; it became obvious only on manual use that a freeform brush was the
+   right interaction). The agent had already flipped `status: done` and moved
+   on, so the workflow gave no place to catch it.
+
+   - **No `## Manual test checklist` section** → proceed to step 3.
+   - **Section present, every item already ticked (`- [x]`)** → proceed to step 3.
+   - **Section present, one or more items unchecked (`- [ ]`)** → STOP. List the
+     unchecked items verbatim in chat, then call `AskUserQuestion` (**single-
+     select**, NOT multiSelect) with exactly these three options:
+
+     - `question`: *"Issue 000N has N unchecked manual test items above. Manual
+       checks catch what unit tests can't — UX feel, file rendering,
+       interactions. Confirm before I flip status: done."*
+     - **`"Manual checklist passes — flip status: done"`** —
+       description: `"I've run every item and they pass. Tick them and complete the issue."`
+     - **`"Manual checklist failed — keep this issue open"`** —
+       description: `"Something doesn't work; the issue stays open while I fix or rework."`
+     - **`"Haven't tested yet — wait"`** —
+       description: `"I'll come back; don't flip done until I confirm."`
+
+     On **passes** → edit the issue file, flip each `- [ ]` under the manual
+     checklist to `- [x]`, then proceed to step 3.
+     On **failed** → STAY on this issue. Ask the user what's wrong; treat as
+     continued TDD on the same id (more red-green-refactor; another commit later).
+     Do NOT proceed to step 3.
+     On **wait** → STAY on this issue. Respond: *"Standing by — ping me when
+     you're ready to confirm."* Do NOT proceed.
+
+   Prose replies follow the same rule — explicit `pass` / `fail` / `wait`, not a
+   bare "ok" / "yes" / "lgtm." If invoked by `afk` (autonomous mode), there is
+   no human to ask — log the unchecked items to the issue's frontmatter as
+   `stuck_reason: manual_checklist_pending` and exit cleanly so the loop moves
+   on; the issue stays `status: open` for the next interactive session.
+
+3. **Read the repo's `.claude/valk-config.md`** to decide what "done" means:
 
    ```bash
    PR_SKILL=$(~/Wenrwa\ Projects/Valkyrie/scripts/read-valk-config.sh pr_skill)
@@ -178,6 +217,6 @@ When all acceptance criteria are checked off:
      - `ready_for_review: false` → leave issue `status: open` and write `stuck_reason: <ci_status>` into the frontmatter. Tell the user what blocked the green signal.
    - **`PR_SKILL` is set but the named skill is not installed** → STOP. Tell the user: "Config requires /<name> but it's not available. Install it or set pr_skill: none in .claude/valk-config.md."
 
-3. If invoked by `afk`, exit cleanly — the loop reads the result on its next iteration with a fresh context.
+4. If invoked by `afk`, exit cleanly — the loop reads the result on its next iteration with a fresh context.
 
 **Why this matters**: "done" without a PR is a frontmatter flip; "done" with a PR is a reviewable artifact. The config gate ensures repos that haven't opted in see no change in behavior.
