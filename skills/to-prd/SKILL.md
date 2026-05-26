@@ -103,23 +103,26 @@ Do NOT paste large PRD sections into chat. The file holds the exhaustive content
 
 Total: under 200 words. No prose paragraphs. If a section has nothing load-bearing, omit it — don't pad.
 
-### 3. Force engagement via a confirm-each checklist
+### 3. Force engagement via AskUserQuestion (single-approve, names full scope)
 
-Immediately after the summary, call `AskUserQuestion` with `multiSelect: true` — a radio reads as "pick one to build," but every decision is in scope and *all* will ship. A checklist makes that explicit and forces per-decision engagement:
+Immediately after the summary, call `AskUserQuestion` (**single-select**, NOT multiSelect) with exactly three options. The single Approve option must name the *total* decision count so the user can't mistake it for picking one decision:
 
-- `question` text: **"All decisions below are in scope and will ALL be built. Tick each you've read and endorse — leaving one unticked means you want to redline it. Tick 'Open the file first' instead if you want to read the full PRD before deciding."**
-- One `"Confirm: <decision-name>"` option per surfaced decision (mirror the names from the chat summary). The option's `description` is the one-line rationale.
-- A final option: **"Open the file first"** — the user wants to read `docs/prd/<slug>.md` before deciding.
+- `question` text: **"This PRD has N decisions above. Approving builds ALL N of them — this is the committed scope, not a pick-list. Approve to ship the whole set, Redline if any decision is wrong, or Open the file first to read."**
+- **`"Approve — build all N decisions (full scope)"`** — description: `"Every decision above ships together. This is the committed scope."`
+- **`"Redline a decision"`** — description: `"Pause — name which decision to change and what to change."`
+- **`"Open the file first"`** — description: `"Wait — read docs/prd/<slug>.md fully before deciding."`
 
 After the user responds:
 
-- **Every decision ticked** → gate satisfied. Proceed to step 4.
-- **Some decisions unticked** (and "Open the file first" not the only tick) → each unticked decision is a redline candidate. Respond: *"You ticked A, C but not B, D. Are B and D wrong (name what to change and I'll revise the PRD) or just unticked (confirm them and I'll proceed)?"* On revision, re-save and re-run step 2.
-- **"Open the file first" ticked alone** → respond: *"Waiting — open `docs/prd/<slug>.md` and ping me when ready; I'll re-run the gate."* Do NOT proceed.
-- **No reply / "Other" / prose "yes"** → not engagement. Respond:
-> "That's not engagement with the PRD. Tick each decision to confirm, or name one to redline. Then we proceed."
+- **Approve** → gate satisfied. Proceed to step 4.
+- **Redline** → ask the user which decision and what to change; revise the PRD; re-save; re-run step 2.
+- **Open the file first** → respond: *"Waiting — open `docs/prd/<slug>.md` and ping me when ready; I'll re-run the gate."* Do NOT proceed.
 
-A bare "yes" / "lgtm" / "proceed" is NOT approval — the checklist must be used. Per-decision ticks are what prove the user read each rationale; the radio version implied false exclusivity ("pick the one to build") even though every option always ships.
+If the user replies in prose instead of clicking, the same rule applies — they must explicitly approve all or name a specific decision to redline. A bare "yes" / "lgtm" / "proceed" / "looks good" is NOT approval. Respond:
+
+> "That's not engagement with the PRD. Click 'Approve — build all N' to commit to the full scope, or name one decision to redline. Then we proceed."
+
+**Design note — do NOT switch this to a per-decision multiSelect checklist.** A previous version tried that: it created a dangerous fail-direction (a user who forgets to tick one decision has it silently interpreted as a redline), and it rendered unreliably with long decision labels + descriptions (text bleeding between rows; duplicated options). The single Approve option whose label *says* "all N" eliminates the false "pick one" exclusivity that triggered the original complaint, without those failure modes. The summary above + the "Open the file first" path provide the deep-read engagement.
 
 ### 4. Hand back to the orchestrator
 
