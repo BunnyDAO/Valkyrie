@@ -1,0 +1,3 @@
+{"type":"session.created","model":"gpt-5-codex"}
+{"type":"item.completed","item":{"type":"agent_message","text":"applied the change"}}
+{"type":"token_count","info":{"total_token_usage":{"input_tokens":2000,"cached_input_tokens":500,"output_tokens":800,"total_tokens":3300}}}

@@ -313,6 +313,7 @@ Stage flips to **▶ TDD**. Two paths:
 ```bash
 afk 10                # 10 iterations, default claude
 afk 10 --cli codex    # 10 iterations, codex
+afk 10 --cli copilot  # 10 iterations, GitHub Copilot CLI
 ```
 
 The loop picks issues in dependency order, spawns a fresh-context agent for each, and exits when done or the iteration cap is hit. Logs in `.claude/valk/afk-logs/`.
@@ -365,7 +366,7 @@ Both are stage-aware — they update the statusline and restore the previous sta
 
 ```bash
 afk <max_iterations> \
-  [--cli claude|codex] \
+  [--cli claude|codex|copilot] \
   [--max-hours <h>] \
   [--max-cost-usd <usd>] \
   [--prompt-file <path>] \
@@ -379,6 +380,7 @@ afk 10                                       # iter cap 10, defaults: 4h, $50
 afk 10 --max-hours 2 --max-cost-usd 25       # tighter caps
 afk 50 --max-hours 12 --max-cost-usd 200     # overnight run with explicit budget
 afk 10 --cli codex                           # codex instead of claude
+afk 10 --cli copilot                         # GitHub Copilot CLI instead of claude
 afk 5  --prompt-file pm.md                   # custom per-iteration prompt
 ```
 

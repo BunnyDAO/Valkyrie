@@ -22,7 +22,7 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
 - **Optional domain & intent docs (progressive enhancement)** — three authoring skills that strengthen the flow *only when you use them*, and are no-ops otherwise: `/to-domain` (a repo's `DOMAIN.md` — bounds, integrations, installer relationship, constraints), `/to-product-map` (an umbrella `PRODUCT-MAP.md` for multi-repo products), and `/to-intent` (a per-task intent brief). DESIGN also opens with an **Intent Lock** that forbids filling the *why* and domain with inference.
 - **A hard TDD gate** — a `PreToolUse` hook (`valk-tdd-gate.sh`) that *mechanically* blocks production-code edits until the TDD stage, so "no code before TDD" is a wall, not a polite refusal. Docs, PRDs, issues, and any `*.md` stay writable.
-- **An `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude` or `--cli codex`. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
+- **An `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude`, `--cli codex`, or `--cli copilot`. Each CLI uses its own login — afk never handles API keys. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
 
 ## Install
 

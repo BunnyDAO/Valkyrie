@@ -1,5 +1,5 @@
 {
-  "_note": "FALLBACK-ONLY. cost-helper.py prefers the CLI's own total_cost_usd (cost_source=reported) and only falls back to these rates when the result event is absent (crash/kill/timeout) or for CLIs that don't emit a cost (codex). Values are still PLACEHOLDER and overestimate — safe for a conservative cap, NOT a real bill. Real published prices: issue 0006 (HITL).",
+  "_note": "claude: cost-helper prefers the CLI's own total_cost_usd (cost_source=reported). codex (run with --json): cost-helper computes cost_source=computed from parsed token usage x the openai rates below, so those values ARE the bill — keep them current. anthropic values are the fallback for claude when no result event is emitted (crash/kill/timeout). Verify against the sources before trusting absolute dollars: issue 0006 (HITL).",
   "_last_verified": "PLACEHOLDER",
   "_sources": [
     "https://www.anthropic.com/pricing",
@@ -30,8 +30,9 @@
   },
   "openai": {
     "gpt-5-codex": {
-      "input_per_mtok":   1.25,
-      "output_per_mtok": 10.00
+      "input_per_mtok":       1.25,
+      "output_per_mtok":     10.00,
+      "cache_read_per_mtok":  0.125
     }
   }
 }

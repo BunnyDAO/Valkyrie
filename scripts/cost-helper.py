@@ -100,11 +100,48 @@ def parse_usage_event(usage: dict) -> tuple[int, int, int, int, int]:
     return input_tok, output_tok, cw5m, cw1h, cread
 
 
+def extract_codex_usage(ev: dict) -> dict | None:
+    """
+    Best-effort token usage from a codex `exec --json` JSONL event.
+
+    codex emits *cumulative* token-count events (unlike claude's per-message
+    deltas), so the caller keeps the LAST one rather than summing. Returns
+    {input, output, cread} or None if this event carries no usage.
+
+    Tolerant of schema drift: looks for a usage dict under several known keys
+    and accepts both codex names (input_tokens / output_tokens /
+    cached_input_tokens) and OpenAI chat names (prompt_tokens /
+    completion_tokens). If codex changes shape, this returns None and the run
+    falls back to the rates.json estimate — it never raises.
+    VERIFY field names against your codex version with: codex exec --json ... | tail.
+    """
+    if not isinstance(ev, dict):
+        return None
+    cand = None
+    info = ev.get("info")
+    if isinstance(info, dict):
+        cand = info.get("total_token_usage") or info.get("token_usage") or info.get("last_token_usage")
+    if not isinstance(cand, dict):
+        cand = ev.get("total_token_usage") or ev.get("token_usage")
+    if not isinstance(cand, dict):
+        return None
+    inp = cand.get("input_tokens", cand.get("prompt_tokens"))
+    out = cand.get("output_tokens", cand.get("completion_tokens"))
+    if inp is None and out is None:
+        return None
+    cread = cand.get("cached_input_tokens", cand.get("cache_read_input_tokens", 0)) or 0
+    return {"input": int(inp or 0), "output": int(out or 0), "cread": int(cread or 0)}
+
+
 def parse_log(logfile: Path) -> dict:
     """
     Read a stream-json log file. Sum usage across all message events AND
     capture the CLI's self-reported `total_cost_usd` from the terminal
     `result` event (Anthropic's own client-side estimate).
+
+    For non-claude CLIs (codex --json) that emit cumulative token-count events
+    instead of claude's per-message usage, the latest codex usage is used as the
+    totals and the model defaults to gpt-5-codex.
 
     Returns dict with model, input, output, cw5m, cw1h, cread, saw_usage,
     and reported_cost (float, or None if no result event carried one).
@@ -113,6 +150,7 @@ def parse_log(logfile: Path) -> dict:
     model = ""
     totals = {"input": 0, "output": 0, "cw5m": 0, "cw1h": 0, "cread": 0}
     saw_usage = False
+    codex_usage = None  # latest cumulative codex token-count event, if any
     reported_cost = None  # last non-null total_cost_usd from a result event
     api_key_source = None  # from the init event; "none" == subscription/OAuth
 
@@ -149,7 +187,7 @@ def parse_log(logfile: Path) -> dict:
             # emits this field; absence only happens in synthetic fixtures.
             if api_key_source is None and ev.get("apiKeySource") is not None:
                 api_key_source = ev.get("apiKeySource")
-            # Pull usage from message events.
+            # Pull usage from message events (claude: per-message deltas).
             msg = ev.get("message")
             if isinstance(msg, dict) and isinstance(msg.get("usage"), dict):
                 i, o, w5, w1, r = parse_usage_event(msg["usage"])
@@ -159,6 +197,20 @@ def parse_log(logfile: Path) -> dict:
                 totals["cw1h"]   += w1
                 totals["cread"]  += r
                 saw_usage = True
+            # codex --json: cumulative token-count event (keep latest, don't sum).
+            cu = extract_codex_usage(ev)
+            if cu is not None:
+                codex_usage = cu
+
+    # Non-claude CLIs (codex) report cumulative usage, not per-message deltas —
+    # apply the latest snapshot only when no claude-style usage was seen.
+    if not saw_usage and codex_usage is not None:
+        totals["input"] = codex_usage["input"]
+        totals["output"] = codex_usage["output"]
+        totals["cread"] = codex_usage["cread"]
+        saw_usage = True
+        if not model:
+            model = "gpt-5-codex"
 
     if not model:
         sys.stderr.write(f"error: no model field found in {logfile}\n")

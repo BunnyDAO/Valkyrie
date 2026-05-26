@@ -189,4 +189,23 @@ HOME="$H" VALK_COST_MODE=dollars "$RALPH_AFK" --debug-cost "$COST_FIX/subscripti
 grep -q "cost_mode=dollars" "$OUT" || fail "case 13b: env dollars must override auto-tokens — got $(cat "$OUT")"
 rm -rf "$H"
 
+# ---------------------------------------------------------------------------
+# 14. codex --json: cumulative token_count event is priced from real openai
+#     rates (cost_source=computed, NOT a placeholder). Model comes from the
+#     session event; cached_input_tokens maps to cread.
+#       input 2000/1e6*1.25 + output 800/1e6*10 + cread 500/1e6*0.125
+#       = 0.0025 + 0.008 + 0.0000625 = 0.0105625 → 6dp = 0.010563
+# ---------------------------------------------------------------------------
+H="$(mktemp -d)"; OUT="$H/run.out"
+make_fake_home "$H"
+HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/codex-usage.log" >"$OUT" 2>&1
+[ $? -eq 0 ] || fail "case 14: nonzero exit — got $(cat "$OUT")"
+grep -q "model=gpt-5-codex" "$OUT" || fail "case 14: model — got $(cat "$OUT")"
+grep -q "input=2000"        "$OUT" || fail "case 14: input — got $(cat "$OUT")"
+grep -q "output=800"        "$OUT" || fail "case 14: output — got $(cat "$OUT")"
+grep -q "cread=500"         "$OUT" || fail "case 14: cread (cached) — got $(cat "$OUT")"
+grep -q "cost_usd=0.010563" "$OUT" || fail "case 14: cost — got $(cat "$OUT")"
+grep -q "cost_source=computed" "$OUT" || fail "case 14: cost_source — got $(cat "$OUT")"
+rm -rf "$H"
+
 echo "cost tests ok"

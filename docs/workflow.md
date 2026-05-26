@@ -112,7 +112,7 @@ Two diagrams. The **interactive workflow** describes a single slice from prompt 
 The interactive flow runs once per user-driven slice. AFK wraps it in a loop that picks unblocked issues, spawns a fresh CLI session per slice, and applies budget caps.
 
 ```
-afk N --max-hours H --max-cost-usd USD --cli claude|codex
+afk N --max-hours H --max-cost-usd USD --cli claude|codex|copilot
    │
    ▼
 ┌────────────────────────────────────────────────────────────────┐

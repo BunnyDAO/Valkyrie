@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# afk — autonomous loop over local issues/ using claude or codex CLI.
+# afk — autonomous loop over local issues/ using the claude, codex, or copilot CLI.
 #
 # Inspired by:
 #   - https://www.aihero.dev/getting-started-with-ralph (Matt Pocock)
@@ -17,22 +17,29 @@
 #   6. Repeats until: max iterations hit, no unblocked issues left, or Ctrl-C
 #
 # Usage:
-#   afk <max_iterations> [--cli claude|codex] [--prompt-file <path>]
+#   afk <max_iterations> [--cli claude|codex|copilot] [--prompt-file <path>]
 #                        [--no-escalate | --escalate-ladder "haiku sonnet opus"
 #                                       | --escalate-tries N]
 #
 # Examples:
 #   afk 10                       # 10 iterations using claude (default)
 #   afk 10 --cli codex           # same but using codex (escalation N/A)
+#   afk 10 --cli copilot         # same but using GitHub Copilot CLI (escalation N/A)
 #   afk 5 --prompt-file pm.md    # override the per-iteration prompt
 #   afk 10 --no-escalate         # one shot per issue (disable escalation)
+#
+# Each CLI authenticates itself — afk never handles API keys. It only requires
+# the chosen CLI to be on PATH and already logged in:
+#   - claude  : Claude subscription / OAuth, or ANTHROPIC_API_KEY
+#   - codex   : `codex login` (ChatGPT), or OPENAI_API_KEY
+#   - copilot : `copilot` signed in to GitHub (Copilot subscription)
 #
 # Model escalation is ON by default (claude only): a failing issue is retried at
 # a higher model tier before being marked stuck. Default ladder is sonnet→opus
 # (afk writes code); pass --escalate-ladder "haiku sonnet opus" to start cheaper.
 # Each attempt is one iteration (counts against caps). Default 1 try/tier;
 # --escalate-tries 2 gives two shots per tier. --no-escalate restores one-shot.
-# For --cli codex, escalation auto-disables (the ladder uses claude aliases).
+# For --cli codex/copilot, escalation auto-disables (the ladder uses claude aliases).
 
 set -euo pipefail
 
@@ -102,7 +109,7 @@ if [ -n "$DEBUG_COST" ]; then
 fi
 
 if [ -z "$MAX_ITERS" ]; then
-  echo "usage: afk <max_iterations> [--cli claude|codex] [--prompt-file <path>] [--max-hours <h>] [--no-escalate] [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]" >&2
+  echo "usage: afk <max_iterations> [--cli claude|codex|copilot] [--prompt-file <path>] [--max-hours <h>] [--no-escalate] [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]" >&2
   exit 2
 fi
 if ! [[ "$MAX_ITERS" =~ ^[0-9]+$ ]]; then
@@ -117,8 +124,8 @@ if ! awk -v c="$MAX_COST_USD" 'BEGIN{exit !(c+0 == c && c+0 > 0)}' </dev/null 2>
   echo "--max-cost-usd must be a positive number (got: $MAX_COST_USD)" >&2; exit 2
 fi
 case "$CLI" in
-  claude|codex) ;;
-  *) echo "--cli must be 'claude' or 'codex' (got: $CLI)" >&2; exit 2 ;;
+  claude|codex|copilot) ;;
+  *) echo "--cli must be 'claude', 'codex', or 'copilot' (got: $CLI)" >&2; exit 2 ;;
 esac
 if ! command -v "$CLI" >/dev/null 2>&1; then
   echo "error: '$CLI' not on PATH" >&2; exit 2
@@ -651,11 +658,26 @@ run_cli() {
       fi
       ;;
     codex)
-      # codex equivalent — non-interactive, auto-approve tool use.
+      # codex equivalent — non-interactive, auto-approve tool use. --json streams
+      # JSONL events (incl. a token-usage event) so cost-helper can price the run
+      # from real token counts instead of a placeholder estimate.
+      # VERIFY: confirm `--json` and its usage-event field names against your codex
+      # version (see cost-helper.py parse_log; a schema mismatch degrades to the
+      # rates.json estimate, it never breaks the loop).
       codex exec \
+        --json \
         --skip-git-repo-check \
         --full-auto \
         "$prompt" \
+        2>&1 | tee "$logfile"
+      ;;
+    copilot)
+      # GitHub Copilot CLI (the agentic `copilot`, npm @github/copilot).
+      # -p / --prompt runs a single non-interactive turn; --allow-all-tools is the
+      # AFK requirement (no human to approve tool calls). Billing is the user's
+      # Copilot subscription, so no per-token cost is emitted (estimate fallback).
+      # VERIFY: confirm these flags against your installed copilot version.
+      copilot --allow-all-tools -p "$prompt" \
         2>&1 | tee "$logfile"
       ;;
   esac
@@ -732,10 +754,16 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   COST_OUT="$(python3 "$COST_HELPER" parse-log "$logfile" 2>&1)"
   COST_RC=$?
   if [ "$COST_RC" -ne 0 ]; then
-    echo "$COST_OUT" >&2
-    EXIT_REASON="cost tracking failed"
-    EXIT_CODE=1
-    break
+    if [ "$CLI" = "claude" ]; then
+      echo "$COST_OUT" >&2
+      EXIT_REASON="cost tracking failed"
+      EXIT_CODE=1
+      break
+    fi
+    # Non-claude CLIs are priced best-effort: an unrecognized log schema degrades
+    # to a zero estimate with a warning rather than killing the loop.
+    echo "afk: cost parse failed for --cli $CLI (best-effort estimate). ($COST_OUT)" >&2
+    COST_OUT="model=$CLI input=0 output=0 cw5m=0 cw1h=0 cread=0 saw_usage=0 cost_usd=0 cost_source=estimated cost_mode=dollars total_tokens=0"
   fi
   # cost-helper emits space-separated key=value pairs. Pull each out.
   ITER_MODEL=$(printf '%s' "$COST_OUT" | awk '{for(i=1;i<=NF;i++) if($i~/^model=/){sub(/^model=/,"",$i); print $i; exit}}')
@@ -754,7 +782,7 @@ while [ "$iter" -lt "$MAX_ITERS" ]; do
   ITER_TOKENS="${ITER_TOKENS:-0}"
 
   if [ "$SAW_USAGE" = "0" ]; then
-    if [ "$ITER_RC" -ne 0 ]; then
+    if [ "$ITER_RC" -ne 0 ] && [ "$CLI" = "claude" ]; then
       echo "afk: iter $iter produced no usage events and CLI exited $ITER_RC. cost tracking failed (log: $logfile)" >&2
       EXIT_REASON="cost tracking failed"
       EXIT_CODE=1
