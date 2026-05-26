@@ -630,6 +630,26 @@ valk-land feature-a                           # integrate-back (supported) — o
 valk-worktree --remove feature-a              # cleanup (drops the merged branch)
 ```
 
+## Loop-back on mid-stream requirement change
+
+When a requirement actually changes after DESIGN — a constraint surfaces at PRD, a new in-scope item appears at ISSUES, a real-world fact invalidates a slice at TDD — the flow rewinds without throwing prior work away.
+
+**The orchestrator drives this**, not the user. `/valk` watches every downstream stage for change signals (explicit re-casts like *"scrap that"* / *"actually instead of X"*, statements that contradict a recorded PRD decision, new in-scope items not in the PRD) and on detection asks a single yes/no:
+
+> "That sounds like a change to [decision]. Loop back to [stage] to amend, or is this clarification of existing scope?"
+
+On confirm, the agent invokes the mechanical action itself:
+
+```bash
+valk-revisit <design|prd|issues> "<one-line summary>"
+```
+
+This validates the target is upstream of the current stage, writes a brief to `docs/changes/<ts>-<slug>.md`, and rewinds the stage marker. The re-entered skill (`grill-with-docs` / `to-prd` / `to-issues`) detects the new note and **amends its artifact in place** — `docs/prd/<slug>.md` gets an updated section plus a `Δ <date>: …` change-log entry; obsoleted issues get `status: obsolete` (never deleted); new issues from the change cite `from_change: <note-path>`. No artifact is regenerated from scratch.
+
+**Hard rule:** TDD loop-back amends scope and re-routes only the affected slice — it never `rm`s or `git checkout`s a test file. Past tests are historical record.
+
+You can also run `valk-revisit` directly in your shell as an escape hatch — useful when you want to record a change proactively before the agent notices.
+
 - **One `valk-worktree <name>` per terminal.** Each flow works on its own
   `valk/<name>` branch in its own checkout. Concurrency stops being a hazard.
 - **Integrate-back: `valk-land <name>` (supported) or manual.** `valk-land`

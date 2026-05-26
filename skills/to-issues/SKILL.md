@@ -128,3 +128,17 @@ fan the independent batches across worktrees:
 > sequentially. Ready to start TDD on the first unblocked one?"
 
 Do NOT start `tdd` yourself — let the orchestrator transition.
+
+## Re-entry on revisit (loop-back)
+
+If `docs/changes/` contains a `.md` file **newer than any file in `issues/`**, this invocation is a re-entry — the user (or `/valk`) looped back via `valk-revisit issues "<what>"`. Read the newest change note and treat it as the revision brief:
+
+- **Amend existing issue files in place** — do NOT regenerate the whole set. Update only the issues the change touches (scope, acceptance criteria, dependencies).
+- For requirements **dropped** by the change, set `status: obsolete` in the affected issue's frontmatter and add a one-line `Obsoleted by:` comment citing the change-note path. Do NOT delete the file — the trail matters.
+- For **new** requirements from the change, create new numbered issue files (continue the sequence; never renumber) with a frontmatter line `from_change: docs/changes/<ts>-<slug>.md`.
+- Append `- Δ <YYYY-MM-DD>: <one-line summary> (issues affected: 0003, 0007; new: 0012)` to `issues/CHANGES.md` (create on first revision).
+- If the change invalidates the dependency graph in the PRD's parallel plan, re-run the "After saving" summary with the updated graph and **explicitly call out** which previously-parallel slices are now serial (or vice versa).
+
+If multiple change notes are newer than `issues/`, apply them in chronological order, one Δ entry each.
+
+**TDD invariant:** if any of the affected issues has already produced tests/code in a downstream stage, the loop-back does NOT discard them — coordinate with `/valk`'s loop-back rule (TDD work amends scope, never `rm`s tests).

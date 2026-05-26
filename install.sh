@@ -235,6 +235,18 @@ fi
 ln -sfn "$REPO/scripts/valk-land" "$target"
 echo "  + valk-land -> $REPO/scripts/valk-land"
 
+# valk-revisit: loop-back — record a mid-stream requirement change + rewind
+# the stage. The orchestrator (/valk) detects changes and calls this on
+# confirm; users can also invoke it directly. PATH-registered like the rest.
+chmod +x "$REPO/scripts/valk-revisit"
+target="$LOCAL_BIN/valk-revisit"
+if [ -e "$target" ] && [ ! -L "$target" ]; then
+  echo "  - existing non-symlink valk-revisit in $LOCAL_BIN — backing up to ${target}.bak"
+  mv "$target" "${target}.bak"
+fi
+ln -sfn "$REPO/scripts/valk-revisit" "$target"
+echo "  + valk-revisit -> $REPO/scripts/valk-revisit"
+
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
   echo "  NOTE: $LOCAL_BIN is not on your PATH. Add this to your shell rc:"

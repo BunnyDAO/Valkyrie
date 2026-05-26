@@ -162,6 +162,39 @@ YOU: "Starting Valkyrie at DESIGN. I'll grill you on the plan first."
 
 Honor `/zoom-out` (read the unfamiliar code), `/refactor-spaghetti` (clean up bad architecture), or any direct ask to step outside the flow. Set stage accordingly (`zoom`, `refactor`) and resume the previous stage when they're done.
 
+### Watching for mid-stream change (loop-back)
+
+Requirements change mid-flow. The PRD-REVIEW gate only catches changes *inside* PRD-REVIEW — once you're at ISSUES or TDD, the one-way flow has no way out. So at every stage downstream of DESIGN, **watch for change signals and surface them yourself**. The user must never have to remember a command to rewind the flow.
+
+**Strong signals (surface immediately):**
+
+- The user says "wait" / "change of plan" / "scrap that" / "actually, instead of X, do Y" / "we also need Z" / "remove X" / "X isn't needed."
+- A user statement contradicts a recorded PRD decision (or the locked Intent / Domain).
+- The user introduces a new in-scope item that isn't in the PRD or issues.
+
+**Weaker signals (ask before assuming — could be clarification):**
+
+- "What about edge case X?" — could already be in-scope.
+- "Also …" — could be already-covered detail.
+
+When you see a strong signal, or a weaker one you can't disambiguate, **surface a single confirmation** — never silently amend an artifact or churn the flow:
+
+> "That sounds like a change to [PRD decision X | the in-scope list | the design's premise]. Loop back to [stage] to amend, or is this clarification of existing scope?"
+
+**On confirm**, invoke the mechanical action yourself via Bash:
+
+```bash
+valk-revisit <design|prd|issues> "<one-line summary of what changed>"
+```
+
+It writes `docs/changes/<ts>-<slug>.md`, validates the target is upstream of the current stage, and resets the marker. The upstream skill (`grill-with-docs` / `to-prd` / `to-issues`) detects the new change note on re-entry and **amends the existing artifact in place** (no overwrite), appending a `Δ <date>: <one-line>` entry. The trail is preserved.
+
+**On deny**, continue forward and note the resolution in your next message ("Treating as clarification of existing scope X.") so the user can correct you if the read was wrong.
+
+**TDD loop-back does NOT discard tests.** If a requirement change at TDD invalidates a test, that test still records the prior behavior — amend scope and re-route only the affected slice. Never `rm` or `git checkout` a test file because of a loop-back.
+
+Manual `valk-revisit` in the user's shell remains an escape hatch — they can record a change proactively without waiting for the agent to notice.
+
 ## Why this is enforced
 
 The user explicitly asked for hard enforcement because the value is in **front-loading the design work**. Skipping straight to implementation produces code the user doesn't trust. Make them feel friction when they try to skip — that friction is the product.

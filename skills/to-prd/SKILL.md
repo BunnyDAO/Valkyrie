@@ -103,24 +103,38 @@ Do NOT paste large PRD sections into chat. The file holds the exhaustive content
 
 Total: under 200 words. No prose paragraphs. If a section has nothing load-bearing, omit it — don't pad.
 
-### 3. Force engagement via AskUserQuestion
+### 3. Force engagement via a confirm-each checklist
 
-Immediately after the summary, call `AskUserQuestion` with options built from the decisions you just surfaced:
+Immediately after the summary, call `AskUserQuestion` with `multiSelect: true` — a radio reads as "pick one to build," but every decision is in scope and *all* will ship. A checklist makes that explicit and forces per-decision engagement:
 
-- 2–3 options of the form **"Approve: <decision-name>"** — clicking one is substantive approval. The click means "I read this rationale and I endorse it."
-- 1 option **"Redline a decision"** — pauses for the user to name which decision and what to change.
-- 1 option **"Open the file first"** — wait; do NOT proceed until they return with approve or redline.
+- `question` text: **"All decisions below are in scope and will ALL be built. Tick each you've read and endorse — leaving one unticked means you want to redline it. Tick 'Open the file first' instead if you want to read the full PRD before deciding."**
+- One `"Confirm: <decision-name>"` option per surfaced decision (mirror the names from the chat summary). The option's `description` is the one-line rationale.
+- A final option: **"Open the file first"** — the user wants to read `docs/prd/<slug>.md` before deciding.
 
-A click on Approve satisfies the gate. A click on Redline → revise PRD → re-save → re-run from step 2.
+After the user responds:
 
-If the user replies in prose instead of clicking, it still must name a specific decision (approve or redline). A bare "yes" / "lgtm" / "proceed" is NOT approval. Respond:
+- **Every decision ticked** → gate satisfied. Proceed to step 4.
+- **Some decisions unticked** (and "Open the file first" not the only tick) → each unticked decision is a redline candidate. Respond: *"You ticked A, C but not B, D. Are B and D wrong (name what to change and I'll revise the PRD) or just unticked (confirm them and I'll proceed)?"* On revision, re-save and re-run step 2.
+- **"Open the file first" ticked alone** → respond: *"Waiting — open `docs/prd/<slug>.md` and ping me when ready; I'll re-run the gate."* Do NOT proceed.
+- **No reply / "Other" / prose "yes"** → not engagement. Respond:
+> "That's not engagement with the PRD. Tick each decision to confirm, or name one to redline. Then we proceed."
 
-> "That's not engagement with the PRD. Pick an option above, or name one decision to redline. Then we proceed."
+A bare "yes" / "lgtm" / "proceed" is NOT approval — the checklist must be used. Per-decision ticks are what prove the user read each rationale; the radio version implied false exclusivity ("pick the one to build") even though every option always ships.
 
 ### 4. Hand back to the orchestrator
 
-Once the user has substantively approved, say:
+Once the user has substantively approved (every decision ticked), say:
 
-> "PRD approved: `<slug>`. Handing back to /valk for issue breakdown."
+> "PRD approved: `<slug>`. Committed scope: <comma-separated decision names>. Handing back to /valk for issue breakdown."
 
 Do NOT run `to-issues` yourself and do NOT set the `issues` stage — the orchestrator owns that transition and will verify the approval happened in this conversation before it proceeds.
+
+## Re-entry on revisit (loop-back)
+
+If `docs/changes/` contains a `.md` file **newer than `docs/prd/<slug>.md`**, this invocation is a re-entry — the user (or `/valk`) looped back via `valk-revisit prd "<what>"`. Read the newest change note and treat it as the revision brief:
+
+- **Amend `docs/prd/<slug>.md` in place — do NOT regenerate from scratch.** Update only the sections the change touches (typically In Scope / Out of Scope / Implementation Decisions / Solution). Decisions not touched by the brief stand as-is.
+- Under a `## Change log` heading at the very bottom (create on first revision), append: `- Δ <YYYY-MM-DD>: <one-line summary>` and cite the change-note path.
+- **Re-run the PRD-REVIEW gate** (steps 1–4 above): `stage.py set prd-review`, re-surface the decisions inline with the *changed* ones marked `(Δ)`, and run the confirm-each checklist over the **full** decision set so the user re-approves the amended PRD. Old approval does not carry over.
+
+If multiple change notes are newer than the PRD, apply them in chronological order, one Δ entry each. The change log must accurately enumerate the revision history — it is the artifact's trail.

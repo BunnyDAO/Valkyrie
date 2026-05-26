@@ -142,6 +142,7 @@ Beyond the domain/language work above, cover the standard design surface:
 
 - **Scope** — what's in, what's out, what's "nice-to-have"
 - **Users & actors** — who triggers this flow, who consumes the output
+- **UX & interaction** — for every user-facing control, nail down what it does on click / press / hover / keyboard; the empty / loading / error / partial / over-quota / offline states; what happens on cancel, back, refresh, browser-close mid-flow; concurrency (two users acting at once; the same user in two tabs); persistence and recovery on mid-flow failure. Under-specified UX is the single most expensive thing to defer — push until each interaction is concrete, not "TBD."
 - **Failure modes** — what happens when the network drops, the input is empty, two users race
 - **Data model** — what entities exist, what their lifecycles are, where state lives
 - **Boundaries** — which existing modules this touches, which new ones it requires
@@ -152,7 +153,7 @@ Beyond the domain/language work above, cover the standard design surface:
 
 Stop when:
 - Every branch you can think of has been resolved or explicitly deferred
-- The user has answered a question with "I don't care, you decide" twice in a row (decision fatigue — they're done designing)
+- The user has answered a question with "I don't care, you decide" twice in a row (decision fatigue — they're done designing). **Exception:** never accept "you decide" for a **UX & interaction** question — what a control does, what an error state looks like, what happens on cancel / refresh / concurrent edits — those get pushed until concrete. Under-specified UX leaving DESIGN is the workflow's most expensive failure after a wrong PRD.
 - The user explicitly says "ok, that's enough, write it up"
 
 When you stop, summarize the session in chat — terse, decision-only.
@@ -167,3 +168,14 @@ Then say:
 > "Ready to turn this into a PRD?"
 
 If they say yes, the Valkyrie orchestrator will route to `to-prd` next. Do NOT run `to-prd` yourself — let the orchestrator handle the transition so the stage marker stays consistent.
+
+## Re-entry on revisit (loop-back)
+
+If `docs/changes/` contains a `.md` file newer than any DESIGN artifact you'd touch (`CONTEXT.md`, the latest `docs/adr/*.md`, `docs/intent/<slug>.md`), this invocation is a re-entry — the user (or `/valk`) looped back via `valk-revisit design "<what>"`. Read the newest change note and treat it as the re-grill brief:
+
+- **Re-grill only the branches the change affects** — do NOT re-run Intent Lock or the full grilling. If the change implies the intent or domain shifted, re-confirm those *briefly* in one or two questions; otherwise leave them locked.
+- Update `CONTEXT.md` for any new / changed terms (inline, same format).
+- If the change demands a new architectural commitment, write a new ADR under `docs/adr/` — do not edit prior ADRs in place (their decisions are historical record).
+- At the end, summarize what the revisit changed (terse — decisions only, not the conversation) and append `- Δ <YYYY-MM-DD>: <one-line summary>` to a `## Change log` at the bottom of `CONTEXT.md` (create on first revision) so the trail is preserved.
+
+If multiple change notes are newer than the artifacts, apply them in chronological order, one Δ entry each.

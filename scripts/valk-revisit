@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+#
+# valk-revisit — record a mid-stream requirement change + loop the stage back.
+#
+# Usage:
+#   valk-revisit <design|prd|issues> "<what changed>"
+#
+# What it does:
+#   1. Validates the target stage is UPSTREAM of the current one (loop-back
+#      rewinds the flow; it cannot skip forward).
+#   2. Writes a change brief to docs/changes/<YYYYMMDD-HHMMSS>-<slug>.md
+#      (frontmatter records from/to stage + timestamp).
+#   3. Calls stage.py set <target> so the statusline reflects the rewind.
+#   4. Prints the next step — the corresponding skill detects the new change
+#      note on re-entry and AMENDS the existing artifact in place (no
+#      overwrite), preserving the trail with a Δ entry at the bottom.
+#
+# Designed to be invoked by the agent (orchestrated by /valk's "Watching for
+# mid-stream change" rule — agent detects the change, asks the user once, runs
+# this on confirm) or directly by the user as an escape hatch.
+
+set -euo pipefail
+
+STAGE_PY="${STAGE_PY:-$HOME/.claude/valkyrie/stage.py}"
+
+usage() {
+  echo "usage: valk-revisit <design|prd|issues> \"<what changed>\"" >&2
+  exit 2
+}
+
+[ "$#" -eq 2 ] || usage
+
+TARGET="$1"
+WHAT="$2"
+
+case "$TARGET" in
+  design|prd|issues) ;;
+  *) echo "valk-revisit: target must be 'design', 'prd', or 'issues' (got: $TARGET)" >&2; exit 2 ;;
+esac
+
+# Empty-or-whitespace description is a footgun: it'd write an unparseable
+# change note. Require something the next agent can actually act on.
+case "$WHAT" in
+  ''|*[![:space:]]*) ;;
+esac
+WHAT_TRIM="$(printf '%s' "$WHAT" | awk '{$1=$1; print}')"
+if [ -z "$WHAT_TRIM" ]; then
+  echo "valk-revisit: change description must be non-empty" >&2
+  exit 2
+fi
+
+if [ ! -f "$STAGE_PY" ]; then
+  echo "valk-revisit: stage helper not found at $STAGE_PY (run install.sh?)" >&2
+  exit 2
+fi
+
+CURRENT="$(python3 "$STAGE_PY" get 2>/dev/null || echo "")"
+CURRENT="${CURRENT:-idle}"
+
+# Stage ordering. Target must be strictly upstream of current; idle (no active
+# flow) is permissive — a user retroactively logging a change before starting
+# a flow is fine.
+stage_rank() {
+  case "$1" in
+    idle) echo 0 ;;
+    design) echo 1 ;;
+    prd) echo 2 ;;
+    prd-review) echo 3 ;;
+    issues) echo 4 ;;
+    tdd|afk|refactor) echo 5 ;;
+    *) echo 99 ;;
+  esac
+}
+
+CUR_R="$(stage_rank "$CURRENT")"
+TGT_R="$(stage_rank "$TARGET")"
+if [ "$CUR_R" -ne 0 ] && [ "$TGT_R" -ge "$CUR_R" ]; then
+  echo "valk-revisit: target '$TARGET' is not upstream of current stage '$CURRENT'." >&2
+  echo "  Loop-back rewinds the flow; continue forward without it." >&2
+  exit 2
+fi
+
+# Slug: lowercased, alnum + single hyphens, ≤40 chars. Empty after cleaning →
+# "change" so the filename is always valid.
+TS="$(date +%Y%m%d-%H%M%S)"
+SLUG="$(printf '%s' "$WHAT_TRIM" \
+  | tr '[:upper:]' '[:lower:]' \
+  | tr -c 'a-z0-9' '-' \
+  | sed -E 's/^-+|-+$//g; s/-+/-/g' \
+  | cut -c1-40)"
+SLUG="${SLUG:-change}"
+
+mkdir -p docs/changes
+FILE="docs/changes/$TS-$SLUG.md"
+{
+  echo "---"
+  echo "ts: $TS"
+  echo "from_stage: $CURRENT"
+  echo "to_stage: $TARGET"
+  echo "---"
+  echo
+  echo "# Requirement change"
+  echo
+  echo "$WHAT_TRIM"
+} > "$FILE"
+
+python3 "$STAGE_PY" set "$TARGET" >/dev/null
+
+case "$TARGET" in
+  design)
+    NEXT="re-enter with /grill-with-docs (or /valk); it reads $FILE, re-grills the affected branches, and updates CONTEXT.md / ADRs in place" ;;
+  prd)
+    NEXT="re-enter with /to-prd; it reads $FILE, amends docs/prd/<slug>.md in place, appends a Δ entry, and re-runs the PRD-REVIEW gate" ;;
+  issues)
+    NEXT="re-enter with /to-issues; it reads $FILE and amends issues/ in place (new / updated / obsoleted slices) with a Δ entry" ;;
+esac
+
+echo "valk-revisit: stage $CURRENT → $TARGET"
+echo "  change note: $FILE"
+echo "  next: $NEXT"
