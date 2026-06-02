@@ -128,10 +128,14 @@ fan the independent batches across worktrees:
 > sequentially in your own shell (the `!` prefix runs in your terminal so you own the loop
 > and see the `Proceed? [y/N]` confirmation). Ready to start TDD on the first unblocked one?"
 
-If the user instead replies "yes, do afk N" / "go" / similar, you may launch `afk N` yourself
-via Bash with `run_in_background: true` — afk auto-confirms when stdin isn't a TTY, so the
-background tool call won't hang on the prompt. Don't auto-launch a multi-hour autonomous loop
-without a clear go-ahead.
+If the user instead replies "yes, do afk N" / "go" / similar, you may launch the loop yourself
+via Bash with `run_in_background: true`. **You MUST pass `--no-confirm`** in that invocation:
+`afk N --no-confirm` (`--cli codex`, etc. as needed). Closed-stdin-without-`--no-confirm` is a
+deliberate abort — it's the safety guard that stops accidental cron / script launches of a
+multi-hour autonomous loop. The background tool call has no TTY, so without `--no-confirm` afk
+will trip that guard at the `Proceed? [y/N]` gate and exit before the first iteration. Don't
+auto-launch the loop without a clear go-ahead from the user — that abort guard exists for the
+same reason you're being told to wait.
 
 Do NOT start `tdd` yourself — let the orchestrator transition.
 
