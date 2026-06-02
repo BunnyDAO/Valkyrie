@@ -379,6 +379,17 @@ gate_confirm() {
     return 0
   fi
 
+  # Non-interactive stdin (Claude background tool call, CI pipeline, `echo |
+  # afk`, etc.) → `read` would return EOF immediately and the case below would
+  # abort. The queue + caps printed above are the audit trail; auto-confirm so
+  # callers who already greenlit at a higher level (or have no TTY at all) can
+  # actually run. Pass --no-confirm explicitly to suppress this notice.
+  if [ ! -t 0 ]; then
+    echo
+    echo "afk: stdin is not a TTY — auto-confirming. (Pass --no-confirm to suppress this notice.)"
+    return 0
+  fi
+
   printf '\nProceed? [y/N]: '
   local answer="" lower
   read -r answer || true

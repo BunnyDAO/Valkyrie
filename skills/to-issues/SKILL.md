@@ -124,8 +124,14 @@ inlined for precision.
 Tell the user how many issues were created and where, and restate the parallel plan so they can
 fan the independent batches across worktrees:
 > "Created N issues in `issues/`. Parallel batches: [0001→0003] ∥ [0002→0004] — spin up a
-> `valk-worktree` per batch to run them concurrently, or `afk N` to chew through them
-> sequentially. Ready to start TDD on the first unblocked one?"
+> `valk-worktree` per batch to run them concurrently, or **`!afk N`** to chew through them
+> sequentially in your own shell (the `!` prefix runs in your terminal so you own the loop
+> and see the `Proceed? [y/N]` confirmation). Ready to start TDD on the first unblocked one?"
+
+If the user instead replies "yes, do afk N" / "go" / similar, you may launch `afk N` yourself
+via Bash with `run_in_background: true` — afk auto-confirms when stdin isn't a TTY, so the
+background tool call won't hang on the prompt. Don't auto-launch a multi-hour autonomous loop
+without a clear go-ahead.
 
 Do NOT start `tdd` yourself — let the orchestrator transition.
 
