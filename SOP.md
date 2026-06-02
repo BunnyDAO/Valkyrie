@@ -316,6 +316,11 @@ afk 10 --cli codex    # 10 iterations, codex
 afk 10 --cli copilot  # 10 iterations, GitHub Copilot CLI
 ```
 
+AFK is **interactive** — it prints the queue and the active caps, then waits at `Proceed? [y/N]` before launching anything. That gate is a deliberate safety guard against accidental cron / script launches of a multi-hour autonomous loop.
+
+- **From a Claude chat, prefer `!afk N`** — the `!` runs the command in your own shell, so the confirmation prompt fires in your terminal and you own the loop (Ctrl-C, monitor logs, etc.).
+- **From automation or when you ask Claude to launch it in the background**, pass `--no-confirm`: e.g. `afk N --no-confirm --cli codex`. Closed stdin *without* `--no-confirm` aborts on purpose — that's what stops a stray pipe or background tool call from kicking off hours of work unattended.
+
 The loop picks issues in dependency order, spawns a fresh-context agent for each, and exits when done or the iteration cap is hit. Logs in `.claude/valk/afk-logs/`.
 
 ### Step 6 — Review the diff
