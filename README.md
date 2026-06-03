@@ -229,13 +229,17 @@ co-located `*.j2` templates with [sc-compose](https://github.com/BunnyDAO/sc-com
 declares required fields up front and **fails loudly** if any is missing. sc-compose is an
 authoring convenience only — Valkyrie reads plain markdown and never needs it at runtime.
 
-### Cost discipline (cheaper models + single-task delegation)
+### Cost discipline (model tier follows leverage, delegate the rest)
 
-The first stages — INTENT/DESIGN, PRD, ISSUES — write **no production code**; they're
-conversation and markdown. So don't pay the strongest model for them:
+The first stages — INTENT / DESIGN, PRD, ISSUES — write **no production code**, but they're
+where the load-bearing architectural decisions get locked in (a wrong PRD poisons every
+downstream issue and every line of code; the PRD-REVIEW gate exists for exactly that reason).
+So model tier should follow *insight required*, not code volume:
 
-- **Match the model to the stage.** At DESIGN, switch the main session with `/model sonnet`
-  (or haiku); switch back to your strongest model for TDD.
+- **Strongest tier at DESIGN / PRD / ISSUES; drop to sonnet at TDD.** Planning needs judgment
+  and broad context; TDD against a clear spec is mostly pattern-matching against
+  red/green/refactor. (The escalation ladder already starts at sonnet for coding; haiku for
+  delegated reads / QA.)
 - **Keep the main session an orchestrator.** Delegate codebase investigation and
   code-writing/QA to **single-task sonnet/haiku sub-agents**, pulling back only the result —
   so the main thread's context stays small. `/valk` and the stage skills are wired to nudge

@@ -34,17 +34,24 @@ flow must reach `tdd` (or the user runs `/valk --skip-to tdd`).
 ## Delegation & cost discipline
 
 The main session is an **orchestrator**, not a worker. Keep its context lean and spend the
-expensive model only on coordination and the human-in-the-loop gates.
+expensive model where the leverage actually lives — the design work and the human-in-the-loop
+gates, not the line-by-line code.
 
 - **Delegate the heavy lifting to single-task background agents.** Codebase investigation
-  (DESIGN) and code-writing + QA (TDD) should be handed to **sonnet or haiku** sub-agents via
-  the Agent tool — **one task per agent**, so each agent's context stays small. Pull back only
-  the result the main session needs to make the next decision; don't drag an agent's full
+  (DESIGN) and code-writing + QA (TDD) should be handed to dedicated sub-agents via the Agent
+  tool — **one task per agent**, so each agent's context stays small. Pull back only the
+  result the main session needs to make the next decision; don't drag an agent's full
   transcript into the main thread.
-- **Match the model to the stage.** INTENT/DESIGN, PRD, and ISSUES write *no production code* —
-  they're conversation and markdown, so a cheaper main-session model suffices. At those stages,
-  suggest the user run `/model sonnet` (or haiku); switch back to the strongest model for TDD.
-  If they're already on a cheap model, don't nag.
+- **Match the model to the *insight* required, not the code volume.** Planning (Intent /
+  DESIGN, PRD, ISSUES) is where the load-bearing architectural decisions get locked in — a
+  wrong PRD poisons every downstream issue and every line of code, which is why the
+  PRD-REVIEW gate exists at all. Those stages need broad context, judgment, and the refusal
+  to settle for a fuzzy answer. **Run the strongest tier you have at DESIGN / PRD / ISSUES**
+  and don't apologise for it; the cost of a bad plan downstream is far higher than the cost
+  of a strong model on the conversation that produces it. **TDD** against a clear spec is
+  mostly pattern-matching against red/green/refactor — **sonnet handles it well**, which is
+  why the escalation ladder already starts there. Delegated reads / simple QA go to haiku.
+  ("No code in this stage = cheap model" inverts the leverage; don't use that framing.)
 - **One task per agent.** Never hand a background agent a multi-step grab-bag — scope it to a
   single investigation, a single slice's implementation, or a single QA pass, then let it exit.
 - **Escalate on failure; don't open expensive.** Start a delegated task on a cheap tier; if it

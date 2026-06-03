@@ -235,15 +235,21 @@ required-field validation.
 Write none of these docs and step 3 still runs — it just has less to ground itself in. That's
 "enforcement scales with what you write" in practice.
 
-### Cost discipline — cheaper models + single-task delegation
+### Cost discipline — model tier follows leverage, delegate the rest
 
-INTENT/DESIGN, PRD, and ISSUES write **no production code** — they're conversation and
-markdown. Only TDD writes code. So don't burn the strongest (most expensive) model on the first
-three stages:
+The expensive model belongs where the *leverage* is. INTENT / DESIGN / PRD / ISSUES write no
+production code, but they're where the load-bearing architectural decisions get locked in —
+a wrong PRD poisons every downstream issue and every line of code, which is exactly why the
+PRD-REVIEW gate exists. So the model-tier rule inverts the obvious one:
 
-- **Match the model to the stage.** Run DESIGN/PRD/ISSUES with `/model sonnet` (or haiku), then
-  switch back to your strongest model for TDD. On API billing that's the bulk of the saving;
-  on a subscription it's rate-limit budget you keep for implementation.
+- **Match the model to the *insight* required, not the code volume.** Run DESIGN / PRD /
+  ISSUES on the strongest tier you have — broad context, judgment, and refusing to settle
+  for a fuzzy answer is what those stages are worth paying for. TDD against a clear spec is
+  mostly pattern-matching against red/green/refactor — **drop to `/model sonnet` once you
+  reach TDD**, which is where the escalation ladder already starts. Delegated reads / simple
+  QA go to haiku. The cost of a bad plan downstream — extra iterations, refactors, or worse,
+  wrong code that passes tests — is far higher than the cost of a strong model on the
+  conversation that produces the plan.
 - **Keep the main session an orchestrator.** Hand codebase investigation (DESIGN) and
   code-writing/QA (TDD) to **single-task sonnet/haiku sub-agents** and pull back only the
   result, so the main thread's context stays small. `/valk` and the stage skills nudge this;
