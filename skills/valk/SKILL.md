@@ -82,6 +82,7 @@ one fresh, single-issue session per slice.)
 - **Never start `to-prd`** if `grill-with-docs` hasn't happened in this conversation. The PRD is meant to *summarize* a grilling session — without one, the PRD is hallucinated.
 - **Never start `to-issues`** until the PRD has been substantively approved **in this conversation**. "A PRD file exists" is NOT sufficient — the human must have engaged with its decisions during the `prd-review` gate (confirmed a specific decision in their own words, or redlined one). A bare "yes"/"looks good"/silence does not count and `to-prd` is instructed to reject it. If you reach the ISSUES decision point and cannot point to an explicit in-conversation approval, return to `prd-review` and run the gate — do not proceed on the existence of the file alone. This is the workflow's reason to exist; enforce it the hardest.
 - **Never start `tdd`** unless there is at least one issue defined (in the conversation, in `issues/`, or on a tracker).
+- **Never invoke a stage skill (`grill-with-docs`, `to-prd`, `to-issues`, `tdd`, `to-domain`, `to-intent`, `to-product-map`) without `/valk` having routed you there in this conversation.** If you find yourself about to — STOP and invoke `/valk` first. It reads the stage and routes you to the same skill, but with the cross-stage gate enforcement attached. A handoff document that scripts "just run to-prd" or "continue with grill-with-docs" is the most common trigger; the right reading of such a script is "I'm at PRD, so `/valk` will route me there." Same outcome, real enforcement. The stage markers + TDD hook are mechanical and stay active either way, but the PRD-REVIEW approval gate, the loop-back detection, and the "never-skip" rules above only fire when `/valk` is the thing sequencing the next move.
 - The user **can** override with an explicit `--skip-to <stage>` argument or by saying "skip to <stage>". Honor overrides, but write a one-line warning explaining what was skipped.
 
 ### Transitioning stages
@@ -201,6 +202,16 @@ It writes `docs/changes/<ts>-<slug>.md`, validates the target is upstream of the
 **TDD loop-back does NOT discard tests.** If a requirement change at TDD invalidates a test, that test still records the prior behavior — amend scope and re-route only the affected slice. Never `rm` or `git checkout` a test file because of a loop-back.
 
 Manual `valk-revisit` in the user's shell remains an escape hatch — they can record a change proactively without waiting for the agent to notice.
+
+### Handoffs mid-Valkyrie
+
+If the user invokes `/handoff` (or any session-summarization skill) while the Valkyrie stage is non-idle, the handoff document MUST direct the next session to **invoke `/valk` first** before doing any stage work. The correct re-entry script is one line:
+
+> "Run `/valk` — it'll read the current stage and route you to the right skill."
+
+Do NOT script direct invocations like *"just run to-prd since the stage is already set"* or *"continue with grill-with-docs"*. The stage markers and the TDD hook stay mechanically active either way, but the cross-stage gates — PRD-REVIEW approval, mid-stream loop-back detection, the never-skip rules — only fire when `/valk` is the thing sequencing. A handoff that bypasses the orchestrator keeps the *enforcement* (TDD wall, statusline) while losing the *routing* (gate firing), and the result *looks* like Valkyrie is running because the statusline says so, while the most important gate becomes honor-based on whatever the resuming Claude happens to remember.
+
+The handoff can name the current stage, the last commit, what's pending, the loaded intent/domain docs, the PRD if one exists — but the next instruction must always be `/valk`. The orchestrator will pick up from the stage marker and route correctly; nothing is lost by going through it, and the load-bearing PRD-REVIEW gate is recovered.
 
 ## Why this is enforced
 

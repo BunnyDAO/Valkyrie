@@ -172,6 +172,8 @@ printf '{"tool_name":"Edit","cwd":"%s","tool_input":{"file_path":"src/x.ts"}}' "
 The threat model is **model drift, not sabotage** — against drift it's a real wall. Disable it
 the same way as the guard: remove its entry from the `hooks` block in `settings.json`.
 
+**Handoff gotcha.** If you `/handoff` mid-Valkyrie (e.g. nearing context limit), the resuming session **must invoke `/valk` first**, not stage skills directly. The stage marker + TDD gate keep mechanical enforcement intact, but the orchestrator's cross-stage gates (PRD-REVIEW approval, mid-stream loop-back detection, the never-skip rules) only fire when `/valk` is the thing routing — a handoff that scripts *"just run to-prd directly"* keeps the statusline looking right while silently turning the load-bearing PRD gate honor-based. `valk/SKILL.md` now refuses to invoke a stage skill without `/valk` having routed there, but the cleanest fix is the handoff itself: tell the next session *"Run `/valk`"* as the first instruction.
+
 ---
 
 ## 3. The four stages — what they're for
