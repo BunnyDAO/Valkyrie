@@ -61,6 +61,12 @@ ESCALATE="1"   # on by default (claude only); disable with --no-escalate
 # "haiku sonnet opus" to start cheaper (good for read/QA-heavy work).
 ESCALATE_LADDER="sonnet opus"
 ESCALATE_TRIES="1"
+# #0005 — track explicit flag use so a forged crew's valk-config `loop:` block
+# can supply defaults *only* where the operator did not pass a flag (flags win).
+MAX_HOURS_SET=""
+MAX_COST_USD_SET=""
+ESCALATE_LADDER_SET=""
+PRINT_CONFIG=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -73,13 +79,15 @@ while [ $# -gt 0 ]; do
     --no-escalate)
       ESCALATE=""; shift ;;
     --escalate-ladder)
-      ESCALATE_LADDER="$2"; shift 2 ;;
+      ESCALATE_LADDER="$2"; ESCALATE_LADDER_SET=1; shift 2 ;;
     --escalate-tries)
       ESCALATE_TRIES="$2"; shift 2 ;;
     --max-hours)
-      MAX_HOURS="$2"; shift 2 ;;
+      MAX_HOURS="$2"; MAX_HOURS_SET=1; shift 2 ;;
     --max-cost-usd)
-      MAX_COST_USD="$2"; shift 2 ;;
+      MAX_COST_USD="$2"; MAX_COST_USD_SET=1; shift 2 ;;
+    --print-config)
+      PRINT_CONFIG=1; shift ;;
     --debug-cost)
       DEBUG_COST="$2"; shift 2 ;;
     --allow-no-prd)
@@ -108,6 +116,26 @@ if [ -n "$DEBUG_COST" ]; then
   exec python3 "$HOME/.claude/valkyrie/cost-helper.py" parse-log "$DEBUG_COST"
 fi
 
+# #0005 — a forged Valkyrie crew's .claude/valk-config.md may carry a `loop:`
+# block (Agent-Builder Forge) whose *outer* caps become afk's defaults; any flag
+# above still wins. Absent file / no `loop:` block ⇒ no change (vanilla afk).
+_VALK_CONFIG="$(pwd)/.claude/valk-config.md"
+if [ -f "$_VALK_CONFIG" ] && grep -qE '^loop:' "$_VALK_CONFIG"; then
+  _loop_field() {
+    grep -E "^[[:space:]]+$1:" "$_VALK_CONFIG" 2>/dev/null | head -1 \
+      | sed -E "s/^[[:space:]]+$1:[[:space:]]*//" || true
+  }
+  _loop_iters="$(_loop_field max_iters)"
+  _loop_hours="$(_loop_field max_hours)"
+  _loop_cost="$(_loop_field max_cost_usd)"
+  # escalate_ladder renders as "[sonnet, opus]"; afk wants "sonnet opus".
+  _loop_ladder="$(_loop_field escalate_ladder | sed -E 's/^\[//; s/\]$//; s/,/ /g' | xargs || true)"
+  [ -z "$MAX_ITERS" ] && [ -n "$_loop_iters" ] && MAX_ITERS="$_loop_iters"
+  [ -z "$MAX_HOURS_SET" ] && [ -n "$_loop_hours" ] && MAX_HOURS="$_loop_hours"
+  [ -z "$MAX_COST_USD_SET" ] && [ -n "$_loop_cost" ] && MAX_COST_USD="$_loop_cost"
+  [ -z "$ESCALATE_LADDER_SET" ] && [ -n "$_loop_ladder" ] && ESCALATE_LADDER="$_loop_ladder"
+fi
+
 if [ -z "$MAX_ITERS" ]; then
   echo "usage: afk <max_iterations> [--cli claude|codex|copilot] [--prompt-file <path>] [--max-hours <h>] [--no-escalate] [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]" >&2
   exit 2
@@ -123,6 +151,16 @@ fi
 if ! awk -v c="$MAX_COST_USD" 'BEGIN{exit !(c+0 == c && c+0 > 0)}' </dev/null 2>/dev/null; then
   echo "--max-cost-usd must be a positive number (got: $MAX_COST_USD)" >&2; exit 2
 fi
+
+# #0005 — resolved-config dry run: print the effective caps (loop-block defaults
+# merged with flags) and exit, running nothing. Used to preview a forged crew's
+# loop block and to make cap resolution testable without an agent CLI on PATH.
+if [ -n "$PRINT_CONFIG" ]; then
+  printf 'max_iters=%s\nmax_hours=%s\nmax_cost_usd=%s\nescalate_ladder=%s\n' \
+    "$MAX_ITERS" "$MAX_HOURS" "$MAX_COST_USD" "$ESCALATE_LADDER"
+  exit 0
+fi
+
 case "$CLI" in
   claude|codex|copilot) ;;
   *) echo "--cli must be 'claude', 'codex', or 'copilot' (got: $CLI)" >&2; exit 2 ;;
