@@ -31,6 +31,40 @@ but they are *not* stages:
 early, the edit is denied at the tool layer, not merely discouraged here. To implement, the
 flow must reach `tdd` (or the user runs `/valk --skip-to tdd`).
 
+## Three lanes — match ceremony to task size
+
+The full DESIGN → PRD → ISSUES → TDD pipeline is the right weight for a *feature*. For smaller
+work it is pure overhead, and that overhead is the single most common complaint. So pick a lane
+**explicitly and out loud** before starting — don't silently default every request to the full
+pipeline.
+
+| Lane | When | What runs |
+|---|---|---|
+| **Trivial** | One-line fix, typo, single-file edit, no design question | Bypass entirely. One line: *"Skipping Valkyrie for this trivial change."* |
+| **Lite** | Small but non-trivial: ~1 vertical slice, ≲2 files, requirements already clear, no architectural fork | **Inline Intent Lock** (lock *why* + domain, 1–2 questions max, no full grill) → confirm scope in one sentence → **straight to TDD**. No PRD file, no `issues/` files — the intent line *is* the spec. |
+| **Full** | Anything ambiguous, multi-module, >~1 slice, or with a real design decision | The complete pipeline: grill → PRD → PRD-REVIEW → issues → TDD. |
+
+**Choosing the lane.** Read the request and state your read in one line, offering the cheaper lane
+when the heuristic says small:
+
+> "This looks like a Lite-lane change (one slice, scope is clear). I'll lock the intent in one
+> question, then go straight to TDD. Say 'full pipeline' if you want the PRD/issues treatment."
+
+The user can always bump up (*"do the full pipeline"*) or down (*"just do it"*). When unsure
+between Lite and Full, ask — don't assume Full.
+
+**Lite lane mechanics.** After the inline Intent Lock and the user's one-line confirmation, set the
+stage straight to `tdd` (this also lifts the TDD gate so code edits are allowed):
+
+```bash
+python3 ~/.claude/valkyrie/stage.py set tdd     # Lite lane: inline intent locked, no PRD/issues artifacts
+```
+
+Lite is **not** a license to skip the *why*. The Intent Lock (no inferring the goal or the domain)
+still runs — that's the irreducible core of the workflow. Lite only drops the heavy *artifacts*
+(PRD document, issue files), not the design *thinking*. If the inline lock surfaces real ambiguity
+or a design fork, **upgrade to the Full lane** and say so.
+
 ## Delegation & cost discipline
 
 The main session is an **orchestrator**, not a worker. Keep its context lean and spend the
@@ -55,10 +89,13 @@ gates, not the line-by-line code.
 - **One task per agent.** Never hand a background agent a multi-step grab-bag — scope it to a
   single investigation, a single slice's implementation, or a single QA pass, then let it exit.
 - **Escalate on failure; don't open expensive.** Start a delegated task on a cheap tier; if it
-  fails ~twice, bump one tier (**haiku → sonnet → opus**), with opus the ceiling — then surface
-  to the human. Pick the *starting* tier by task type (haiku for reads/simple QA, sonnet for
-  most coding); starting too low can cost more in retries than starting a tier up. `afk` does
-  this mechanically by default (claude only; `--no-escalate` to opt out), one issue at a time.
+  fails ~twice, bump one tier (ceiling is opus, then surface to the human). Pick the *starting*
+  tier by task type — haiku for reads/simple QA, **sonnet for most coding** — because starting
+  too low can cost more in retries than starting a tier up. `afk` does this mechanically by
+  default (claude only; `--no-escalate` to opt out), one issue at a time; its default ladder is
+  **sonnet → opus**. The full `haiku → sonnet → opus` ladder is **opt-in** (`--escalate-ladder`)
+  for read/QA-heavy autonomous runs — Valkyrie does *not* default to "haiku first." Full policy:
+  `docs/cost-model.md`.
 
 This is honor-based guidance (a hook can't force a sub-agent spawn), but it's the difference
 between a lean orchestrator and a bloated, expensive main thread. (`afk` already embodies it —
@@ -137,6 +174,43 @@ At **TDD**, crew mode runs **per issue**: for each unblocked issue, mint a task
 reviewer-gate) scoped to that task's blackboard; the issue is `done` only if
 its gate passes.
 
+### Inner loops (best-effort port — Agent-Builder #0009)
+
+A forged crew may declare **Loop pairs** in its `valk-config.md` `loop:` block
+(Agent-Builder's Looper). Valkyrie honors them **best-effort** — the loop-back is
+honor-based (you, following this prose), with afk's `--max-cost-usd` run cap as
+the hard cost backstop (arena is the enforced reference; here it's advisory).
+
+Read the pairs with the helper (one record per pair, in dispatch-order):
+
+```bash
+read-valk-config.sh --pairs    # → from=<role> critic=<role> max_iter=<n> [budget=<v> budget_mode=<m>]
+```
+
+For **each pair** (process nested pairs innermost-first; pairs are disjoint or
+properly nested — never crossing):
+
+1. Dispatch the pair's member range `from … critic` in order (the usual crew
+   dispatch). When you run the **critic**, append the loop-verdict contract to
+   its brief: *"End your turn with a fenced `loop-verdict` block —
+   `{ "status": "pass"|"fail"|"stop", "message": "…", "details": {} }`."*
+2. Read the critic's verdict from its output:
+   ```bash
+   parse-loop-verdict.sh <critic-output-file>   # → pass | fail | stop (empty + non-zero if none)
+   ```
+3. Route on it: **pass** → proceed past the critic; **fail** → re-run the pair's
+   range from `from` (feed the critic's message back), up to **`max_iter`** times;
+   **stop** → halt immediately and escalate to the human.
+4. **Budget:** a pair's `budget` (when `budget_mode: valkyrie-usd`) is advisory at
+   per-pair granularity — the hard cost stop is afk's crew-level `--max-cost-usd`.
+   Treat the per-pair budget as a soft ceiling: if afk's accumulated cost is near
+   the cap, stop the loop and surface it rather than burning the whole budget.
+
+**Best-effort gaps vs the arena reference (acceptable, by design):** no mid-turn
+budget enforcement (it's between iterations / afk's global cap); no resumable
+loop state across afk restarts; crossing pairs are assumed already rejected by the
+builder. A dedicated per-pair `PreToolUse` budget hook is a future hardening.
+
 ### Triggers that should drop into Valkyrie automatically
 
 If the user says any of these and stage is `idle`, start the workflow at DESIGN:
@@ -146,7 +220,7 @@ If the user says any of these and stage is `idle`, start the workflow at DESIGN:
 - "refactor X to do Y"
 - "/valk", "/valkyrie", "/v"
 
-For trivial one-line fixes, typo corrections, or single-file edits, you may bypass the workflow and just do the work — but say one line: "Skipping Valkyrie for this trivial change."
+Before starting, **pick a lane** (see "Three lanes — match ceremony to task size" above): Trivial (bypass with a one-line notice), Lite (inline intent lock → straight to TDD, for small clear-scope changes), or Full (the complete pipeline). State your read in one line and let the user bump up or down.
 
 ### Default flow
 

@@ -23,9 +23,12 @@ set -u
 
 REPO="$(pwd)"
 
+PAIRS=""
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) REPO="$2"; shift 2 ;;
+    --pairs) PAIRS=1; shift ;;   # #0009 — emit the loop: pairs list as records
     -h|--help)
       sed -n '2,20p' "$0"; exit 0 ;;
     *)
@@ -38,8 +41,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "${KEY:-}" ]; then
-  echo "usage: read-valk-config.sh [--repo <dir>] <key>[.<subkey>]" >&2
+if [ -z "$PAIRS" ] && [ -z "${KEY:-}" ]; then
+  echo "usage: read-valk-config.sh [--repo <dir>] (<key>[.<subkey>] | --pairs)" >&2
   exit 2
 fi
 
@@ -47,6 +50,54 @@ CONFIG="$REPO/.claude/valk-config.md"
 
 # Missing file = no opt-in. Empty output, exit 0 (not an error).
 if [ ! -f "$CONFIG" ]; then
+  exit 0
+fi
+
+# --pairs (#0009): extract the nested `loop: pairs:` list as one bash-parseable
+# record per pair — `from=… critic=… max_iter=… [budget=… budget_mode=…]` (in
+# that field order; budget fields omitted when absent). Empty output when there
+# is no loop block / no pairs. The inner-loop orchestration (skill prose) reads
+# these to re-run each pair's range until its critic passes.
+if [ -n "$PAIRS" ]; then
+  python3 - "$CONFIG" <<'PY' 2>/dev/null
+import sys, re
+text = open(sys.argv[1], encoding='utf-8').read()
+m = re.match(r'\A---\s*\n(.*?)\n---\s*(?:\n|$)', text, re.DOTALL)
+if not m:
+    sys.exit(0)
+pairs, cur = [], None
+in_loop = in_pairs = False
+for raw in m.group(1).splitlines():
+    if not raw.strip() or raw.lstrip().startswith('#'):
+        continue
+    indent = len(raw) - len(raw.lstrip())
+    s = raw.strip()
+    if indent == 0:
+        in_loop = s.startswith('loop:')
+        in_pairs = False
+        cur = None
+        continue
+    if not in_loop:
+        continue
+    if indent == 2:
+        in_pairs = (s == 'pairs:')
+        cur = None
+        continue
+    if in_pairs:
+        if s.startswith('- '):
+            cur = {}
+            pairs.append(cur)
+            s = s[2:].strip()
+        if cur is not None and ':' in s:
+            k, _, v = s.partition(':')
+            cur[k.strip()] = v.strip().strip('"').strip("'")
+ORDER = [('loop_back_to', 'from'), ('critic', 'critic'), ('max_iter', 'max_iter'),
+         ('budget', 'budget'), ('budget_mode', 'budget_mode')]
+for p in pairs:
+    if not p.get('loop_back_to') or not p.get('critic'):
+        continue
+    print(' '.join(f'{out}={p[src]}' for src, out in ORDER if p.get(src, '') != ''))
+PY
   exit 0
 fi
 

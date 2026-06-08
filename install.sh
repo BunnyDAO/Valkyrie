@@ -263,6 +263,14 @@ install_link "$REPO/scripts/valk-land" "$LOCAL_BIN/valk-land" "valk-land"
 chmod +x "$REPO/scripts/valk-revisit"
 install_link "$REPO/scripts/valk-revisit" "$LOCAL_BIN/valk-revisit" "valk-revisit"
 
+# read-valk-config / parse-loop-verdict: helpers the inner-loop skill prose
+# (#0009) calls by name — read the loop: pairs list + a critic's verdict. Other
+# scripts still call read-valk-config.sh by sibling path; this just also exposes
+# both on PATH so the crew can invoke them.
+chmod +x "$REPO/scripts/read-valk-config.sh" "$REPO/scripts/parse-loop-verdict.sh"
+install_link "$REPO/scripts/read-valk-config.sh" "$LOCAL_BIN/read-valk-config.sh" "read-valk-config.sh"
+install_link "$REPO/scripts/parse-loop-verdict.sh" "$LOCAL_BIN/parse-loop-verdict.sh" "parse-loop-verdict.sh"
+
 if ! echo ":$PATH:" | grep -q ":$LOCAL_BIN:"; then
   echo
   echo "  NOTE: $LOCAL_BIN is not on your PATH. Add this to your shell rc:"
