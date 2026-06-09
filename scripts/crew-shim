@@ -5,22 +5,47 @@
 # no-op guarantee is provable, not LLM-judged (Agent-Builder #0021 / ADR 0002).
 #
 #   crew-shim decide <repo-root> <STAGE>
+#   crew-shim mode   <STAGE>
 #
-# Prints exactly one line:
+# `decide` prints exactly one line:
 #   vanilla              -> run the stock sub-skill verbatim (no behaviour change)
 #   crew <id> <id> ...   -> dispatch these bound agents for the stage
 #
 # vanilla when: no valk-config.md, OR it is not `version: 1`, OR the stage's
 # agent list is empty/absent. Anything else is a strict no-op.
+#
+# `mode` prints the dispatch MODE for a stage (Agent-Builder #0114 / ADR-0026).
+# This is a FIXED rule keyed by the stage's nature — NOT a valk-config field:
+#   DESIGN -> augment   PRD -> augment   ISSUES -> replace   TDD -> replace
+# This is the single source of truth for the rule, so the /valk prose never
+# hard-codes it. `augment` = the bound crew runs ALONGSIDE the preserved human
+# work, writing design-input.md + challenges.md to the blackboard (input +
+# gating); the human authors + arbitrates; a gating `status: blocked` is
+# advisory-must-acknowledge. `replace` = the crew does the stage's work INSTEAD
+# of the sub-skill; a gating `status: blocked` is a hard halt (today's behavior).
+# `mode` is independent of any binding — it answers "IF a crew runs here, how?".
 
 set -u
 
 cmd="${1:-}"
+
+if [ "$cmd" = "mode" ]; then
+  stage="${2:-}"
+  [ -n "$stage" ] || { echo "usage: crew-shim mode <STAGE>" >&2; exit 2; }
+  STAGE="$(printf '%s' "$stage" | tr '[:lower:]' '[:upper:]')"
+  case "$STAGE" in
+    DESIGN|PRD)   echo augment ;;
+    ISSUES|TDD)   echo replace ;;
+    *) echo "crew-shim: unknown stage '$stage' (want DESIGN|PRD|ISSUES|TDD)" >&2; exit 2 ;;
+  esac
+  exit 0
+fi
+
 repo="${2:-}"
 stage="${3:-}"
 
 if [ "$cmd" != "decide" ] || [ -z "$repo" ] || [ -z "$stage" ]; then
-  echo "usage: crew-shim decide <repo-root> <STAGE>" >&2
+  echo "usage: crew-shim decide <repo-root> <STAGE>  |  crew-shim mode <STAGE>" >&2
   exit 2
 fi
 

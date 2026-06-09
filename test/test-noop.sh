@@ -74,5 +74,28 @@ EOF
 expect "$D" DESIGN vanilla
 expect "$D" TDD    "crew implementer tester-qa reviewer"
 
-echo "ok: absent/empty/unversioned valk-config is a complete no-op"
+# E — `decide` is byte-identical regardless of mode. The augment-mode arc
+# (#0114) must NOT change the no-op guarantee: a repo with NO binding still
+# decides `vanilla` at every stage, byte-for-byte (no mode leakage into decide).
+E="$(mkrepo e)"
+for s in DESIGN PRD ISSUES TDD; do expect "$E" "$s" vanilla; done
+
+# F — the FIXED stage→mode rule (#0114 / ADR-0026): DESIGN/PRD augment,
+# ISSUES/TDD replace. Independent of any binding (mode answers "IF a crew runs
+# here, how?"), so it holds with no valk-config.md at all.
+expect_mode() { # expect_mode <STAGE> <augment|replace>
+  local got; got="$("$SHIM" mode "$1" 2>/dev/null)"
+  [ "$got" = "$2" ] || { echo "FAIL: mode $1 -> '$got' (want '$2')"; exit 1; }
+}
+expect_mode DESIGN augment
+expect_mode PRD    augment
+expect_mode ISSUES replace
+expect_mode TDD    replace
+# case-insensitive stage arg, same as decide
+expect_mode design augment
+expect_mode tdd    replace
+# unknown stage is a usage error (exit non-zero), not a silent default
+"$SHIM" mode BOGUS >/dev/null 2>&1 && { echo "FAIL: mode BOGUS should exit non-zero"; exit 1; }
+
+echo "ok: absent/empty/unversioned valk-config is a complete no-op; stage→mode rule fixed"
 exit 0

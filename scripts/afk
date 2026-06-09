@@ -136,6 +136,32 @@ if [ -f "$_VALK_CONFIG" ] && grep -qE '^loop:' "$_VALK_CONFIG"; then
   [ -z "$ESCALATE_LADDER_SET" ] && [ -n "$_loop_ladder" ] && ESCALATE_LADDER="$_loop_ladder"
 fi
 
+# #0111 — evaluator modes (ADR-0027). A forged loop pair may carry
+# `evaluatorMode` (agent | human | agent-escalate). afk is the UNATTENDED lane,
+# so `agent` is its native mode (unchanged). The other two want a human in the
+# loop — afk can't pause for one mid-run, so it degrades to "run, then SURFACE":
+# we record any non-`agent` pairs here and report them in the final summary so an
+# unattended run never silently swallows a mode that asked for a human. Empty /
+# all-agent ⇒ no change (vanilla afk). The pairs themselves are honored
+# best-effort by the /valk inner-loop prose; this is just afk's surfacing.
+ESCALATE_PAIRS=""   # roles of pairs whose evaluatorMode is human/agent-escalate
+_SCRIPT_DIR_PRE="$(cd "$(dirname "$0")" && pwd)"
+_READ_CFG_PRE="$_SCRIPT_DIR_PRE/read-valk-config.sh"
+if [ -x "$_READ_CFG_PRE" ]; then
+  while IFS= read -r _pair; do
+    [ -n "$_pair" ] || continue
+    case " $_pair " in
+      *" evaluator_mode=human "*|*" evaluator_mode=agent-escalate "*)
+        _pmode="${_pair##* evaluator_mode=}"; _pmode="${_pmode%% *}"
+        _pcritic="${_pair#*critic=}"; _pcritic="${_pcritic%% *}"
+        ESCALATE_PAIRS="${ESCALATE_PAIRS}${ESCALATE_PAIRS:+, }${_pcritic} (${_pmode})"
+        ;;
+    esac
+  done <<EOF
+$("$_READ_CFG_PRE" --repo "$(pwd)" --pairs 2>/dev/null || true)
+EOF
+fi
+
 if [ -z "$MAX_ITERS" ]; then
   echo "usage: afk <max_iterations> [--cli claude|codex|copilot] [--prompt-file <path>] [--max-hours <h>] [--no-escalate] [--escalate-ladder \"haiku sonnet opus\"] [--escalate-tries N]" >&2
   exit 2
@@ -156,8 +182,8 @@ fi
 # merged with flags) and exit, running nothing. Used to preview a forged crew's
 # loop block and to make cap resolution testable without an agent CLI on PATH.
 if [ -n "$PRINT_CONFIG" ]; then
-  printf 'max_iters=%s\nmax_hours=%s\nmax_cost_usd=%s\nescalate_ladder=%s\n' \
-    "$MAX_ITERS" "$MAX_HOURS" "$MAX_COST_USD" "$ESCALATE_LADDER"
+  printf 'max_iters=%s\nmax_hours=%s\nmax_cost_usd=%s\nescalate_ladder=%s\nhuman_eval_pairs=%s\n' \
+    "$MAX_ITERS" "$MAX_HOURS" "$MAX_COST_USD" "$ESCALATE_LADDER" "$ESCALATE_PAIRS"
   exit 0
 fi
 
@@ -572,6 +598,11 @@ print_summary() {
   fi
   printf "  issues done:   %d\n"        "$done_n"
   printf "  issues stuck:  %d\n"        "$stuck_n"
+  # #0111 — surface forged loop pairs that asked for a human evaluator. afk runs
+  # unattended, so these couldn't pause mid-run; flag them for the human's return.
+  if [ -n "$ESCALATE_PAIRS" ]; then
+    printf "  human-eval:    %s — review on return (/valk pauses for these live)\n" "$ESCALATE_PAIRS"
+  fi
   if [ "$RUN_TELEM_SEEN" -eq 1 ]; then
     printf "  edits w/o read:%d  (proxy for inference — eyeball these)\n" "$RUN_TELEM_UNREAD"
     printf "  telemetry:     %s\n" ".claude/valk/telemetry/"

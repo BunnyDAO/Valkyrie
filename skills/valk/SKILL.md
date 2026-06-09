@@ -159,20 +159,62 @@ It prints exactly `vanilla` or `crew <id> <id> …`, applying the
   byte-identical to having no shim at all. The default and common case (proven
   by the no-op test, `test/test-noop.sh`).
 - **`crew <ids>` — `version: 1` AND a non-empty list for the current stage →
-  dispatch exactly those bound agents for this stage instead of the stock
-  sub-skill.** Each id maps to `<repo>/.claude/agents/<id>.md`.
-  Run them over the scoped blackboard via the bundled `crew-task` (mint a task,
-  thread its dir into each agent's brief). `support` agents are available to
-  any stage.
+  dispatch exactly those bound agents for this stage.** Each id maps to
+  `<repo>/.claude/agents/<id>.md`. Run them over the scoped blackboard via the
+  bundled `crew-task` (mint a task, thread its dir into each agent's brief).
+  `support` agents are available to any stage. **How** they run depends on the
+  stage's **mode** (below).
 
-The shim only replaces a stage's **work**, never the **enforcement**: stage
-order and the `prd-review` gate stay enforced exactly as above; a gating agent
-(e.g. reviewer/security) writing `status: blocked` halts that line of work.
+#### Augment vs replace — the dispatch mode (Agent-Builder #0114 / ADR-0026)
 
-At **TDD**, crew mode runs **per issue**: for each unblocked issue, mint a task
-`tdd-<issue-id>` and dispatch the bound crew (e.g. implementer → tester-qa →
-reviewer-gate) scoped to that task's blackboard; the issue is `done` only if
-its gate passes.
+A bound crew runs in one of two modes, **fixed by the stage's nature** (it is
+**not** a `valk-config` field). Ask the shim — never hard-code the rule:
+
+```bash
+crew-shim mode <STAGE>   # → augment (DESIGN, PRD)  |  replace (ISSUES, TDD)
+```
+
+- **`replace` (ISSUES, TDD)** — the bound crew does the stage's work **instead
+  of** the stock sub-skill (today's behavior, unchanged). The crew **holds the
+  pen** on the artifact (decomposable work: issue slicing, code). A gating agent
+  (reviewer/security) writing `status: blocked` is a **hard halt** — that line of
+  work stops until resolved.
+
+- **`augment` (DESIGN, PRD)** — the bound crew runs **alongside** the preserved
+  human work with **at most one pen-holder** (single coherent voice). Authorship
+  is **privilege-derived** (ADR-0026 amendment): each bound class contributes
+  strictly per its posture, read from the bundle's `valk-config.md`:
+  - **lead `read-write` class → drafts the artifact.** The single bound
+    `read-write` class writes `design.md` / the PRD. With **2+** `read-write`
+    classes bound the `lead:` block in `valk-config.md` names the one lead (e.g.
+    `lead:\n  DESIGN: cto-architect`); the others demote to **input** for that
+    artifact. With **one** `read-write` class it *is* the lead.
+  - **gating classes → `challenges.md`** — gating objections against the drafted
+    direction.
+  - **read-only classes → `design-input.md`** — proposals, options-with-tradeoffs,
+    threat models, ADR-consistency notes (the *input* the author synthesizes).
+  - **the human always gates + arbitrates.**
+
+  Dispatch each bound class to its posture-derived file, then surface a **terse
+  summary** to the user. **No `read-write` class bound** (or no `lead:` marker when
+  it is ambiguous) → the crew never holds the pen and **the human authors** the
+  design/PRD from `design-input.md` + `challenges.md` (the original behavior).
+  Many lenses feeding input is good and never touches coherence, because only the
+  **single lead pen-holder** (a class or the human) authors the artifact.
+
+  **Augment gating is advisory-must-acknowledge.** A gating agent writing
+  `status: blocked` in an augment stage is **surfaced prominently** and you must
+  make the human **explicitly acknowledge or override** it before moving on — it
+  must never be silently missed — but it does **not** hard-halt (the human
+  arbitrates). This is the one gate-semantics difference from replace.
+
+The shim only changes a stage's **work**, never the **enforcement**: stage order
+and the `prd-review` gate stay enforced exactly as above, in both modes.
+
+At **TDD** (replace), crew mode runs **per issue**: for each unblocked issue,
+mint a task `tdd-<issue-id>` and dispatch the bound crew (e.g. implementer →
+tester-qa → reviewer-gate) scoped to that task's blackboard; the issue is `done`
+only if its gate passes.
 
 ### Inner loops (best-effort port — Agent-Builder #0009)
 
@@ -184,7 +226,7 @@ the hard cost backstop (arena is the enforced reference; here it's advisory).
 Read the pairs with the helper (one record per pair, in dispatch-order):
 
 ```bash
-read-valk-config.sh --pairs    # → from=<role> critic=<role> max_iter=<n> [budget=<v> budget_mode=<m>]
+read-valk-config.sh --pairs    # → from=<role> critic=<role> max_iter=<n> [budget=<v> budget_mode=<m>] [evaluator_mode=<m>]
 ```
 
 For **each pair** (process nested pairs innermost-first; pairs are disjoint or
@@ -206,10 +248,35 @@ properly nested — never crossing):
    Treat the per-pair budget as a soft ceiling: if afk's accumulated cost is near
    the cap, stop the loop and surface it rather than burning the whole budget.
 
+**Evaluator mode (best-effort — Agent-Builder #0111 / ADR-0027).** A pair may
+carry `evaluator_mode` (the `--pairs` record's optional last field). It selects
+**who the pair's evaluator is** — the graduated-autonomy spine, applied
+best-effort here:
+
+- **`agent`** (default, and what an absent field means) — today's autonomous
+  loop, exactly as steps 1–4 above. A `stop` verdict still halts and escalates to
+  the human, but `fail`/`max_iter`/budget exhaustion resolve autonomously.
+- **`agent-escalate`** — autonomous like `agent`, but on **stop** *or*
+  **exhaustion** (`max_iter` hit without a pass, or the budget/cost backstop
+  trips) you **surface to the human** rather than silently halting the loop:
+  state the pair, the last critic message, and why it stopped, and ask how to
+  proceed. (Under `afk` this rides the existing stuck/escalation surface — a pair
+  that exhausts is reported, not silently dropped; under interactive `/valk` you
+  raise it in the conversation.)
+- **`human`** — the evaluator **is the human**: instead of dispatching an agent
+  critic, **pause and ask the human** to approve / redline / stop the pair's
+  range (approve = pass → proceed; redline = fail → re-run from `from` with their
+  feedback; stop = halt). This is the interactive-`/valk` pause; it is **not**
+  an `afk` mode (afk is unattended — a `human` pair there degrades to
+  `agent-escalate`: run the range, then surface for the human to evaluate on
+  return).
+
 **Best-effort gaps vs the arena reference (acceptable, by design):** no mid-turn
 budget enforcement (it's between iterations / afk's global cap); no resumable
 loop state across afk restarts; crossing pairs are assumed already rejected by the
-builder. A dedicated per-pair `PreToolUse` budget hook is a future hardening.
+builder; `human`/`agent-escalate` surfacing is a notify-and-continue-on-return,
+not arena's suspended-resumable `AWAITING_HUMAN` run state. A dedicated per-pair
+`PreToolUse` budget hook is a future hardening.
 
 ### Triggers that should drop into Valkyrie automatically
 

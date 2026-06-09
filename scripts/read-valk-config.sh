@@ -54,10 +54,17 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 # --pairs (#0009): extract the nested `loop: pairs:` list as one bash-parseable
-# record per pair — `from=… critic=… max_iter=… [budget=… budget_mode=…]` (in
-# that field order; budget fields omitted when absent). Empty output when there
-# is no loop block / no pairs. The inner-loop orchestration (skill prose) reads
-# these to re-run each pair's range until its critic passes.
+# record per pair — `from=… critic=… max_iter=… [budget=… budget_mode=…]
+# [evaluator_mode=…]` (in that field order; optional fields omitted when absent).
+# Empty output when there is no loop block / no pairs. The inner-loop
+# orchestration (skill prose) reads these to re-run each pair's range until its
+# critic passes.
+#
+# #0111 — a pair may carry `evaluatorMode` (agent | human | agent-escalate),
+# emitted as `evaluator_mode=<v>` (only when explicitly set). It selects who the
+# pair's evaluator is: `agent` (today's autonomous loop), `agent-escalate`
+# (autonomous, but surface to the human on stop/exhaustion), or `human`
+# (interactive /valk pausing). Absent ⇒ `agent` (the caller's default).
 if [ -n "$PAIRS" ]; then
   python3 - "$CONFIG" <<'PY' 2>/dev/null
 import sys, re
@@ -92,7 +99,8 @@ for raw in m.group(1).splitlines():
             k, _, v = s.partition(':')
             cur[k.strip()] = v.strip().strip('"').strip("'")
 ORDER = [('loop_back_to', 'from'), ('critic', 'critic'), ('max_iter', 'max_iter'),
-         ('budget', 'budget'), ('budget_mode', 'budget_mode')]
+         ('budget', 'budget'), ('budget_mode', 'budget_mode'),
+         ('evaluatorMode', 'evaluator_mode')]
 for p in pairs:
     if not p.get('loop_back_to') or not p.get('critic'):
         continue

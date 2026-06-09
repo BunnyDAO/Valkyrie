@@ -31,5 +31,23 @@ have 'per issue|tdd-<'                        'per-issue dispatch at TDD'
 have 'single, central|do not edit the stage sub-skills|sub-skills.*untouched' \
                                               'central shim / sub-skills untouched'
 
+# #0114 / ADR-0026 — augment mode + advisory-must-acknowledge gate.
+have 'augment'                                'augment mode named'
+have 'replace'                                'replace mode named'
+lit  'crew-shim mode'                         'the mode helper is documented'
+lit  'design-input.md'                        'augment writes design-input.md'
+lit  'challenges.md'                          'augment writes challenges.md'
+have 'advisory-must-acknowledge|acknowledge or override' \
+                                              'augment gate is advisory-must-acknowledge'
+have 'hard.?halt'                             'replace keeps the hard-halt'
+have 'author|holds the pen'                   'human stays author/arbiter in augment'
+
+# #0116 / ADR-0026 amendment — augment authorship is privilege-derived
+# (lead read-write class drafts; human authors when no read-write class bound).
+have 'privilege-derived|posture'              'augment authorship is privilege-derived'
+have 'read-write'                             'read-write posture names the author'
+have 'lead'                                   'the single lead author / lead: marker'
+have 'human authors'                          'human authors when no read-write class bound'
+
 echo "ok: crew shim contract documented in valk/SKILL.md"
 exit 0
