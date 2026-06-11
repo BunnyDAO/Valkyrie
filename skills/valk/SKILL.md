@@ -271,12 +271,21 @@ best-effort here:
   `agent-escalate`: run the range, then surface for the human to evaluate on
   return).
 
-**Best-effort gaps vs the arena reference (acceptable, by design):** no mid-turn
-budget enforcement (it's between iterations / afk's global cap); no resumable
-loop state across afk restarts; crossing pairs are assumed already rejected by the
-builder; `human`/`agent-escalate` surfacing is a notify-and-continue-on-return,
-not arena's suspended-resumable `AWAITING_HUMAN` run state. A dedicated per-pair
-`PreToolUse` budget hook is a future hardening.
+**Mechanical route-back (#0030):** the inner loop is no longer purely honor-based.
+A `Stop` hook (`valk-loop-gate.sh`, installed by install.sh) parses the transcript's
+last fenced `loop-verdict`: on `fail` with iterations left it **blocks the stop**
+and re-issues the route-back instruction, counting iterations in
+`.claude/valk/loop-ledger.json` (per-session) so `max_iter` is a hard bound;
+`pass` resets the pair's count; `stop` is allowed through (escalation is the
+point). Ambiguity is permissive — no config / no verdict / unattributable critic
+→ no block. The prose above remains the *recipe*; the hook is the *wall*.
+
+**Best-effort gaps vs the arena reference (acceptable, by design):** per-pair
+USD budget stays advisory — hooks see no cost data, so afk's global
+`--max-cost-usd` remains the hard money stop; no resumable loop state across afk
+restarts (the ledger is per-session); crossing pairs are assumed already rejected
+by the builder; `human`/`agent-escalate` surfacing is a notify-and-continue-on-
+return, not arena's suspended-resumable `AWAITING_HUMAN` run state.
 
 ### Triggers that should drop into Valkyrie automatically
 

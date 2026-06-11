@@ -53,6 +53,11 @@ if [ -f "$HOOKS_DIR/valk-guard.sh" ]; then
   rm -f "$HOOKS_DIR/valk-guard.sh"
   echo "  - Removed $HOOKS_DIR/valk-guard.sh"
 fi
+if [ -f "$HOOKS_DIR/valk-loop-gate.sh" ]; then
+  echo "==> Removing loop-gate hook"
+  rm -f "$HOOKS_DIR/valk-loop-gate.sh"
+  echo "  - Removed $HOOKS_DIR/valk-loop-gate.sh"
+fi
 
 # --- 4. Remove afk symlinks -------------------------------------------------
 

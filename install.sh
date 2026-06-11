@@ -146,6 +146,12 @@ cp "$REPO/scripts/valk-telemetry.sh" "$HOOKS_DIR/valk-telemetry.sh"
 chmod +x "$HOOKS_DIR/valk-telemetry.sh"
 echo "  + $HOOKS_DIR/valk-telemetry.sh"
 
+# Stop-hook loop gate: mechanically enforces inner-loop route-back + max_iter
+# (#0030). Reads valk-config/transcript from the hook input, so no re-point.
+cp "$REPO/scripts/valk-loop-gate.sh" "$HOOKS_DIR/valk-loop-gate.sh"
+chmod +x "$HOOKS_DIR/valk-loop-gate.sh"
+echo "  + $HOOKS_DIR/valk-loop-gate.sh"
+
 # --- 4. patch settings.json -------------------------------------------------
 
 echo "==> wiring statusline + hook into $SETTINGS"
@@ -165,6 +171,7 @@ settings_path = Path("$SETTINGS")
 hook_path = "$CLAUDE_HOME/hooks/valk-guard.sh"
 gate_path = "$CLAUDE_HOME/hooks/valk-tdd-gate.sh"
 telemetry_path = "$CLAUDE_HOME/hooks/valk-telemetry.sh"
+loopgate_path = "$CLAUDE_HOME/hooks/valk-loop-gate.sh"
 statusline_path = "$CLAUDE_HOME/valkyrie/statusline.py"
 
 # On Windows, convert to Git Bash format (/c/Users/... instead of C:Users...)
@@ -173,6 +180,7 @@ if sys.platform == 'win32' and len(hook_path) > 2 and hook_path[1] == ':':
     hook_path = '/' + hook_path[0].lower() + hook_path[2:].replace(chr(92), '/')
     gate_path = '/' + gate_path[0].lower() + gate_path[2:].replace(chr(92), '/')
     telemetry_path = '/' + telemetry_path[0].lower() + telemetry_path[2:].replace(chr(92), '/')
+    loopgate_path = '/' + loopgate_path[0].lower() + loopgate_path[2:].replace(chr(92), '/')
     statusline_path = '/' + statusline_path[0].lower() + statusline_path[2:].replace(chr(92), '/')
 data = {}
 if settings_path.exists() and settings_path.stat().st_size > 0:
@@ -225,6 +233,16 @@ if not telem_wired:
         "hooks": [{"type": "command", "command": telemetry_path}],
     })
 
+# Merge the Stop-hook loop gate the same idempotent way (no matcher — Stop
+# hooks fire once per stop; the script itself exits fast for non-crew repos).
+stop = hooks.setdefault("Stop", [])
+loop_wired = any(
+    any(h.get("command") == loopgate_path for h in entry.get("hooks", []))
+    for entry in stop if isinstance(entry, dict)
+)
+if not loop_wired:
+    stop.append({"hooks": [{"type": "command", "command": loopgate_path}]})
+
 # Ensure parent directory exists (important for Windows)
 settings_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -234,6 +252,7 @@ try:
     print(f"  + UserPromptSubmit hook -> {hook_path}")
     print(f"  + PreToolUse TDD gate -> {gate_path}")
     print(f"  + PostToolUse telemetry -> {telemetry_path}")
+    print(f"  + Stop loop gate -> {loopgate_path}")
 except Exception as e:
     print(f"  ✗ Failed to write settings.json: {e}", file=sys.stderr)
     sys.exit(1)
