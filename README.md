@@ -22,6 +22,7 @@ The goal: **5x your engineers without overcomplicating things** by making them t
 - **Two escape-hatch skills**: `/zoom-out` (re-orient on unfamiliar code) and `/refactor-spaghetti` (find deepening opportunities in tangled code).
 - **Optional domain & intent docs (progressive enhancement)** — three authoring skills that strengthen the flow *only when you use them*, and are no-ops otherwise: `/to-domain` (a repo's `DOMAIN.md` — bounds, integrations, installer relationship, constraints), `/to-product-map` (an umbrella `PRODUCT-MAP.md` for multi-repo products), and `/to-intent` (a per-task intent brief). DESIGN also opens with an **Intent Lock** that forbids filling the *why* and domain with inference.
 - **A hard TDD gate** — a `PreToolUse` hook (`valk-tdd-gate.sh`) that *mechanically* blocks production-code edits until the TDD stage, so "no code before TDD" is a wall, not a polite refusal. Docs, PRDs, issues, and any `*.md` stay writable.
+- **A hard loop gate** — a `Stop` hook (`valk-loop-gate.sh`) that *mechanically* enforces a forged crew's inner Looper: when the critic's last fenced `loop-verdict` is `fail` with iterations left, the session is **blocked from stopping** and routed back to re-run the range; a per-session ledger makes `max_iter` a hard bound. `pass` proceeds, `stop` escalates to you. (Per-pair `$` budgets stay advisory — `afk --max-cost-usd` is the money stop.)
 - **Loop-back on mid-stream change** — `valk-revisit <design|prd|issues> "<what changed>"` records a requirement change to `docs/changes/<ts>-<slug>.md`, rewinds the stage, and the relevant skill amends its artifact in place on re-entry (no overwrite, full Δ trail). `/valk` watches for change signals (explicit re-casts, PRD contradictions, new in-scope items) and runs this on confirm, so you never have to remember the command. TDD loop-back **never** discards tests.
 - **An `afk` loop runner** — chew through issues autonomously while you sleep, with `--cli claude`, `--cli codex`, or `--cli copilot`. Each CLI uses its own login — afk never handles API keys. Run **`!afk N`** from a Claude chat to drive it from your own shell (you see the `Proceed? [y/N]` confirmation); to invoke from automation or a background tool call, pass `--no-confirm` — closed stdin without it deliberately aborts as a safety guard against accidental launches. Inspired by the Ralph pattern from Geoffrey Huntley and Matt Pocock.
 
@@ -231,38 +232,23 @@ authoring convenience only — Valkyrie reads plain markdown and never needs it 
 
 ### Cost discipline (model tier follows leverage, delegate the rest)
 
-The first stages — INTENT / DESIGN, PRD, ISSUES — write **no production code**, but they're
-where the load-bearing architectural decisions get locked in (a wrong PRD poisons every
-downstream issue and every line of code; the PRD-REVIEW gate exists for exactly that reason).
-So model tier should follow *insight required*, not code volume:
+Model tier should follow *insight required*, not code volume — the planning stages write no code
+but lock in the load-bearing decisions, so they get the strongest tier; TDD drops to sonnet;
+delegated reads/QA go to haiku. **Valkyrie does not "start on haiku and climb to opus"** — that's
+the opt-in `afk` ladder only; the interactive policy is the opposite.
 
-- **Strongest tier at DESIGN / PRD / ISSUES; drop to sonnet at TDD.** Planning needs judgment
-  and broad context; TDD against a clear spec is mostly pattern-matching against
-  red/green/refactor. (The escalation ladder already starts at sonnet for coding; haiku for
-  delegated reads / QA.)
-- **Keep the main session an orchestrator.** Delegate codebase investigation and
-  code-writing/QA to **single-task sonnet/haiku sub-agents**, pulling back only the result —
-  so the main thread's context stays small. `/valk` and the stage skills are wired to nudge
-  this, and `afk` already runs one fresh single-issue session per slice.
-- **Escalate, don't open expensive.** On repeated failure, bump one tier — the full ladder is
-  **haiku → sonnet → opus** (opus the ceiling, then a human). `afk` does this mechanically per
-  issue **by default** (claude only), retrying a failing issue at the next tier before giving up.
-  Its default ladder is **sonnet → opus** (afk writes code, so haiku-first just churns); pass
-  `--escalate-ladder "haiku sonnet opus"` to start cheaper for read/QA-heavy work, or
-  `--no-escalate` to turn it off.
-- **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
-  emits a batch plan; run each independent batch in its own `valk-worktree` to work concurrently
-  (integrate back with `valk-land`).
+The full policy — the model table, the orchestrator/delegation rules, the escalation ladder, the
+"is it token heavy?" answer, and the `~/.claude/CLAUDE.md` snippet to make it global — lives in one
+canonical place: **[`docs/cost-model.md`](docs/cost-model.md).**
 
-To make it the default for **every** session (not just Valkyrie workflows), drop this into your
-`~/.claude/CLAUDE.md`:
+### Is this worth it over using Claude Code directly?
 
-```md
-## Cost discipline (orchestration)
-- Use sonnet or haiku background agents for investigations, code-writing, and QA wherever appropriate and possible.
-- Keep the main session focused on orchestration so goals are met and context stays small.
-- Give each background agent a single task to limit its context overhead.
-```
+Honest answer, including who should *not* use it: **[`docs/vs-a-la-carte.md`](docs/vs-a-la-carte.md)**
+— the four things Valkyrie adds over invoking skills à la carte, and a who's-it-for table. To
+right-size cost per task, `/valk` picks one of **three lanes** (Trivial / Lite / Full) so small
+changes skip the heavy pipeline. And rather than argue the token question on vibes, measure it on
+your own tasks with the A/B harness in **[`scripts/benchmark/`](scripts/benchmark/README.md)** and
+audit whether the main session actually delegates with `scripts/valk-delegation-audit.py`.
 
 ### AFK audit log
 
@@ -322,7 +308,8 @@ Valkyrie/
 └── scripts/
     ├── afk                    # autonomous loop, claude or codex
     ├── valk-guard.sh          # UserPromptSubmit: nudge into the flow
-    └── valk-tdd-gate.sh       # PreToolUse: block code edits before TDD
+    ├── valk-tdd-gate.sh       # PreToolUse: block code edits before TDD
+    └── valk-loop-gate.sh      # Stop: enforce inner-loop route-back + max_iter
 ```
 
 ## Credits

@@ -46,6 +46,8 @@ curl -fsSL https://raw.githubusercontent.com/moonbox3/ccstatusbar/v1.0.1/install
 | UserPromptSubmit hook | `~/.claude/hooks/valk-guard.sh` | Global, runs every prompt | Soft-start enforcement — nudges build prompts into `/valk`. See §2. |
 | PreToolUse TDD gate | `~/.claude/hooks/valk-tdd-gate.sh` | Global, runs on edit/Bash tool calls | Hard wall — mechanically blocks production-code edits before TDD. See §2. |
 | PostToolUse telemetry | `~/.claude/hooks/valk-telemetry.sh` | Global, runs on file tool calls | The AFK audit log — records file Read/Edit during active stages. See §7. |
+| Stop loop gate | `~/.claude/hooks/valk-loop-gate.sh` | Global, runs when a session stops | Hard wall — a crew critic's `fail` loop-verdict blocks the stop and forces the route-back; `max_iter` bounded by the loop ledger. No-op outside crew repos. |
+| Loop ledger | `<repo>/.claude/valk/loop-ledger.json` | Per-project | Per-session inner-loop iteration counts (written by the loop gate). |
 | Settings glue | `~/.claude/settings.json` | Global | Wires the statusline + hook. Patched in place. |
 | Stage marker | `<repo>/.claude/valk/stage` | Per-project | Current workflow stage. Each repo tracks its own. |
 | AFK logs | `<repo>/.claude/valk/afk-logs/` | Per-project | One log file per `afk` iteration. |
@@ -239,44 +241,23 @@ Write none of these docs and step 3 still runs — it just has less to ground it
 
 ### Cost discipline — model tier follows leverage, delegate the rest
 
-The expensive model belongs where the *leverage* is. INTENT / DESIGN / PRD / ISSUES write no
-production code, but they're where the load-bearing architectural decisions get locked in —
-a wrong PRD poisons every downstream issue and every line of code, which is exactly why the
-PRD-REVIEW gate exists. So the model-tier rule inverts the obvious one:
+The full policy is maintained in one canonical place so it can't drift across docs:
+**[`docs/cost-model.md`](docs/cost-model.md).** The essentials:
 
-- **Match the model to the *insight* required, not the code volume.** Run DESIGN / PRD /
-  ISSUES on the strongest tier you have — broad context, judgment, and refusing to settle
-  for a fuzzy answer is what those stages are worth paying for. TDD against a clear spec is
-  mostly pattern-matching against red/green/refactor — **drop to `/model sonnet` once you
-  reach TDD**, which is where the escalation ladder already starts. Delegated reads / simple
-  QA go to haiku. The cost of a bad plan downstream — extra iterations, refactors, or worse,
-  wrong code that passes tests — is far higher than the cost of a strong model on the
-  conversation that produces the plan.
-- **Keep the main session an orchestrator.** Hand codebase investigation (DESIGN) and
-  code-writing/QA (TDD) to **single-task sonnet/haiku sub-agents** and pull back only the
-  result, so the main thread's context stays small. `/valk` and the stage skills nudge this;
-  `afk` already runs one fresh single-issue session per slice.
-- **Escalate instead of starting expensive.** On repeated failure bump one tier (full order
-  **haiku → sonnet → opus**, opus the ceiling, then a human). `afk` does this **by default**
-  (claude only): it retries a failing issue at the next tier per iteration before marking it
-  stuck. Its default ladder is **sonnet → opus** (afk writes code); pass
-  `--escalate-ladder "haiku sonnet opus"` to start cheaper for read/QA-heavy work. Tune shots
-  per tier with `--escalate-tries N` (default 1); disable with `--no-escalate`. (Each attempt is
-  one iteration — counts against the caps.)
-- **Parallelize across worktrees.** `/to-issues` treats `blocked_by` as the parallelism map and
-  prints the independent batches; spin up a `valk-worktree` per batch to run them concurrently,
-  then `valk-land` each back. (Sequential alternative: `afk N`.)
+- **Model tier follows insight, not code volume.** Strongest tier at DESIGN / PRD / ISSUES;
+  drop to `/model sonnet` at TDD; delegated reads/QA on haiku.
+- **Valkyrie does not "start on haiku and climb to opus."** `afk`'s *default* ladder is
+  **sonnet → opus**; the `haiku sonnet opus` ladder is opt-in (`--escalate-ladder`) for
+  read/QA-heavy autonomous work only. The interactive policy is the opposite of haiku-first.
+- **Keep the main session an orchestrator** — delegate investigation and code-writing/QA to
+  single-task sub-agents, pull back only the result. (Honor-based; audit with
+  `scripts/valk-delegation-audit.py`.)
+- **Token-heavy?** Yes, by design — it trades first-draft tokens for less rework. Measure it
+  honestly with the A/B harness in `scripts/benchmark/`, and use the **Lite lane** for small
+  tasks instead of the full pipeline.
 
-To make this the default for **every** session — not just Valkyrie runs — add this block to
-your `~/.claude/CLAUDE.md` (it's auto-loaded once per session, so it costs nothing per turn —
-unlike pasting it each time):
-
-```md
-## Cost discipline (orchestration)
-- Use sonnet or haiku background agents for investigations, code-writing, and QA wherever appropriate and possible.
-- Keep the main session focused on orchestration so goals are met and context stays small.
-- Give each background agent a single task to limit its context overhead.
-```
+See [`docs/cost-model.md`](docs/cost-model.md) for the model table, the escalation flags, the
+worktree parallelism, and the `~/.claude/CLAUDE.md` snippet that makes it global.
 
 ---
 
