@@ -29,7 +29,9 @@ import os
 import re
 import sys
 
-STATUSES = {"open", "in_progress", "done", "stuck", "obsolete"}
+# Recognized issue statuses. afk only ever *picks* `open`; the rest are parked
+# (paused), terminal (done/obsolete), or non-actionable (in_progress/stuck).
+STATUSES = {"open", "in_progress", "done", "stuck", "paused", "obsolete"}
 
 
 def parse_issue(path):

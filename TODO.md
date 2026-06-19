@@ -55,6 +55,16 @@ When all of these land, AFK has the same level of technical enforcement as the i
 
 ## install.sh
 
+- [ ] **Wire in `valk-issues` (currently installed manually).** `scripts/valk-issues.py`
+  (ready-work query + dependency-graph lint; afk pre-flight depends on it) is not yet
+  in `install.sh`/`uninstall.sh` — deferred because `install.sh` had an in-flight edit
+  on the shared checkout when it landed. Add, mirroring the existing helpers:
+  - `install.sh` — copy into PM_DIR (afk's fallback path) **and** symlink onto PATH for the human CLI:
+    ```sh
+    cp "$REPO/scripts/valk-issues.py" "$PM_DIR/valk-issues.py"; chmod +x "$PM_DIR/valk-issues.py"
+    ln -sf "$PM_DIR/valk-issues.py" "$LOCAL_BIN/valk-issues"   # alongside read-valk-config.sh etc.
+    ```
+  - `uninstall.sh` — remove `$PM_DIR/valk-issues.py` and `$LOCAL_BIN/valk-issues`.
 - [ ] **Add a `--uninstall` flag.** Symmetric with install: remove symlinks, restore `settings.json` from backup if present, drop the hook. Org members will want this for cleanup.
 - [ ] **Add a smoke test at the end of install** that pipes a known build prompt through the freshly-installed hook and confirms enforcement context comes back. Catches broken installs at install time, not at first use.
 

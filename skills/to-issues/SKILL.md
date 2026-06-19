@@ -115,7 +115,7 @@ Use the template below.
 id: pvp-v1-01        # <epic-prefix>-<NN>, namespaced per epic (see step 5) — never a global counter
 title: <short descriptive name>
 type: AFK            # or HITL
-status: open         # open | in_progress | done | stuck
+status: open         # open | in_progress | done | stuck | paused | obsolete (afk only picks `open`)
 blocked_by: []       # list of issue ids, e.g. [pvp-v1-01, crew-exec-02]
 parent: docs/prd/<slug>.md   # path to the PRD (optional)
 work_item_id:        # numeric tracker ID (Azure Boards / Jira / etc.) — required if .claude/valk-config.md sets pr_skill
