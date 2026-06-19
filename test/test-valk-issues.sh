@@ -84,6 +84,18 @@ out="$(run lint)"; rc=$?
 [ "$rc" -eq 2 ] || { echo "FAIL: cycle should exit 2, got $rc"; exit 1; }
 echo "$out" | grep -q "CYCLE" || { echo "FAIL: expected CYCLE: $out"; exit 1; }
 
+# --- inert duplicate (both done, no live referrer) is a WARNING, not error --
+mkissues
+issue "0039-crew.md" 0039 done "[]"
+issue "0039-subscribe.md" 0039 done "[]"
+out="$(run lint)"; rc=$?
+[ "$rc" -eq 0 ] || { echo "FAIL: all-done dup should be inert (exit 0), got $rc: $out"; exit 1; }
+echo "$out" | grep -q "inert" || { echo "FAIL: expected inert warning: $out"; exit 1; }
+# ...but if a LIVE issue depends on that ambiguous id, it becomes an error
+issue "0050-live.md" 0050 open "[0039]"
+out="$(run lint)"; rc=$?
+[ "$rc" -eq 2 ] || { echo "FAIL: dup referenced by live issue should error (exit 2), got $rc: $out"; exit 1; }
+
 # --- id / filename mismatch ------------------------------------------------
 mkissues
 issue "wrong-name-01-x.md" totally-different-id open "[]"

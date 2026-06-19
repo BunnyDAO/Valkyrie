@@ -126,6 +126,15 @@ def find_problems(issues):
     """Return a list of (severity, code, key, detail) tuples.
     severity is 'error' (graph-breaking — blocks afk) or 'warn' (informational)."""
     out = []
+    LIVE = {"open", "in_progress"}
+    live = lambda i: i["status"] in LIVE
+    status_by_id = {i["id"]: i["status"] for i in issues if i["id"]}
+    # ids any LIVE issue depends on — a fault touching one of these can mis-route
+    # the running afk loop; a fault only among done/parked work is inert (warn).
+    ref_by_live = set()
+    for i in issues:
+        if live(i):
+            ref_by_live.update(i["blocked_by"])
 
     # Per-file malformed frontmatter (severity comes from the parser).
     for i in issues:
@@ -138,30 +147,37 @@ def find_problems(issues):
         if i["id"]:
             by_id.setdefault(i["id"], []).append(i)
             if not i["base"].startswith(i["id"] + "-"):
-                out.append(("error", "ID_FILENAME_MISMATCH", i["id"],
+                sev = "error" if (live(i) or i["id"] in ref_by_live) else "warn"
+                out.append((sev, "ID_FILENAME_MISMATCH", i["id"],
                             "file %s does not start with the id prefix %r"
                             % (i["base"], i["id"] + "-")))
     for iid, group in sorted(by_id.items()):
         if len(group) > 1:
-            out.append(("error", "DUPLICATE_ID", iid,
-                        "shared by " + ", ".join(g["base"] for g in group)))
+            inert = not any(live(g) for g in group) and iid not in ref_by_live
+            sev = "warn" if inert else "error"
+            tail = " (all done & unreferenced by live work — inert)" if inert else ""
+            out.append((sev, "DUPLICATE_ID", iid,
+                        "shared by " + ", ".join(g["base"] for g in group) + tail))
 
-    # Dependency edges: dangling, ambiguous, self.
+    # Dependency edges: dangling, ambiguous, self. A broken edge only matters
+    # while afk could pick the dependent — i.e. when the dependent is live.
     for i in issues:
+        edge_sev = "error" if live(i) else "warn"
         for tok in i["blocked_by"]:
             if tok == i["id"]:
-                out.append(("error", "SELF_DEP", i["id"], "issue lists itself in blocked_by"))
+                out.append((edge_sev, "SELF_DEP", i["id"], "issue lists itself in blocked_by"))
                 continue
             matches = resolve_token(tok, issues)
             if not matches:
-                out.append(("error", "DANGLING_DEP", i["id"],
+                out.append((edge_sev, "DANGLING_DEP", i["id"],
                             "blocked_by %r matches no issue (it can never become ready)" % tok))
             elif len(matches) > 1:
-                out.append(("error", "AMBIGUOUS_DEP", i["id"],
+                out.append((edge_sev, "AMBIGUOUS_DEP", i["id"],
                             "blocked_by %r matches %d files (%s) — afk picks one arbitrarily"
                             % (tok, len(matches), ", ".join(m["base"] for m in matches))))
 
-    # Cycle detection over resolved edges.
+    # Cycle detection over resolved edges. A cycle blocks the loop only if at
+    # least one node is live; a cycle entirely among done issues is inert.
     graph = {}
     for i in issues:
         deps = []
@@ -185,7 +201,8 @@ def find_problems(issues):
                 key = tuple(sorted(set(cyc)))
                 if key not in seen_cycles:
                     seen_cycles.add(key)
-                    out.append(("error", "CYCLE", cyc[0], " -> ".join(cyc)))
+                    sev = "error" if any(status_by_id.get(n) in LIVE for n in cyc) else "warn"
+                    out.append((sev, "CYCLE", cyc[0], " -> ".join(cyc)))
             elif color[nxt] == WHITE:
                 visit(nxt, stack + [nxt])
         color[node] = BLACK
