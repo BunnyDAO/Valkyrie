@@ -148,8 +148,11 @@ Before invoking a stage's sub-skill, make the decision **deterministically** —
 do not eyeball `<repo>/.claude/valk-config.md` yourself. Run the helper:
 
 ```bash
-crew-shim decide <repo-root> <STAGE>
+~/.claude/valkyrie/crew-shim decide <repo-root> <STAGE>
 ```
+
+(`crew-shim` is copied to `~/.claude/valkyrie/` by `install.sh`, not symlinked onto
+`PATH` — invoke it by that absolute path, the same way `stage.py` is called.)
 
 It prints exactly `vanilla` or `crew <id> <id> …`, applying the
 `<repo>/.claude/valk-config.md` contract (produced by Agent-Builder's Forge):
@@ -160,8 +163,10 @@ It prints exactly `vanilla` or `crew <id> <id> …`, applying the
   by the no-op test, `test/test-noop.sh`).
 - **`crew <ids>` — `version: 1` AND a non-empty list for the current stage →
   dispatch exactly those bound agents for this stage.** Each id maps to
-  `<repo>/.claude/agents/<id>.md`. Run them over the scoped blackboard via the
-  bundled `crew-task` (mint a task, thread its dir into each agent's brief).
+  `<repo>/.claude/agents/<id>.md`. Run them over the scoped blackboard via
+  `crew-task` — shipped by the **Agent-Builder–forged crew bundle**, not Valkyrie
+  itself; it is present only in a forged repo alongside `.claude/valk-config.md`
+  (mint a task, thread its dir into each agent's brief).
   `support` agents are available to any stage. **How** they run depends on the
   stage's **mode** (below).
 
@@ -171,7 +176,7 @@ A bound crew runs in one of two modes, **fixed by the stage's nature** (it is
 **not** a `valk-config` field). Ask the shim — never hard-code the rule:
 
 ```bash
-crew-shim mode <STAGE>   # → augment (DESIGN, PRD)  |  replace (ISSUES, TDD)
+~/.claude/valkyrie/crew-shim mode <STAGE>   # → augment (DESIGN, PRD)  |  replace (ISSUES, TDD)
 ```
 
 - **`replace` (ISSUES, TDD)** — the bound crew does the stage's work **instead

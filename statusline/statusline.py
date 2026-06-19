@@ -31,11 +31,10 @@ NO_COLOR = bool(os.environ.get("NO_COLOR"))
 
 
 def c(code: str, text: str) -> str:
-    if NO_COLOR or not sys.stdout.isatty() and not os.environ.get("FORCE_COLOR"):
-        # Statusline output is rendered by Claude Code, which interprets ANSI
-        # even when not a TTY. Always emit unless NO_COLOR is set.
-        if NO_COLOR:
-            return text
+    # Statusline output is rendered by Claude Code, which interprets ANSI even
+    # when not a TTY, so emit color unless NO_COLOR is explicitly set.
+    if NO_COLOR:
+        return text
     return f"\x1b[{code}m{text}\x1b[0m"
 
 

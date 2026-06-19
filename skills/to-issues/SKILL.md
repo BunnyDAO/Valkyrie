@@ -56,7 +56,7 @@ Do NOT paste full issue bodies into chat. The files (saved in step 5) hold full 
 After the per-issue lines, add one **Parallel plan** line showing the independent batches and
 their worktrees, e.g.:
 
-`Parallel: [0001→0003] ∥ [0002→0004] ∥ [0005] — run each batch in its own valk-worktree`
+`Parallel: [pvp-v1-01→pvp-v1-03] ∥ [pvp-v1-02→pvp-v1-04] ∥ [pvp-v1-05] — run each batch in its own valk-worktree`
 
 Then call `AskUserQuestion` with these options:
 
@@ -73,15 +73,38 @@ If the user replies in prose, it must name a specific change (split N, merge N+M
 
 **Default — local files (works without GitHub):**
 
-Create `issues/` in the repo root if it doesn't exist. Save each slice as:
+Create `issues/` in the repo root if it doesn't exist.
+
+**Issue IDs are namespaced per epic — never a global counter.** Concurrent Valkyrie
+flows share one checkout (see `valk-worktree`), so a global `0001…` sequence collides:
+two flows both read the same max and reuse the same numbers. A reused id is not merely
+cosmetic — `afk` resolves `blocked_by` by id-prefix glob (`find issues -name "<id>-*.md"
+-print -quit`), so a duplicate id can silently point a dependency at the wrong issue and
+mis-route the autonomous loop. Namespacing makes ids collision-free by construction:
+
+- **Epic prefix** — a short, kebab-case stem derived from the PRD slug
+  (`docs/prd/<slug>.md`): `pvp-v1-frontend-and-mock-settlement` → `pvp-v1`,
+  `crew-execution-engine` → `crew-exec`. Before committing to it, glob `issues/` for any
+  existing `<prefix>-*.md` belonging to a *different* epic; if found, lengthen the prefix
+  with more of the slug until it is unique. No PRD (standalone run)? Derive the stem from
+  the feature name the same way.
+- **Local sequence** — `01`, `02`, … zero-padded to **at least two digits** (padding stops
+  `<prefix>-01` from also matching `<prefix>-10` in the dependency glob). Numbered in
+  dependency order, blockers first, within this epic only. One agent owns one to-issues
+  run, so the local sequence has no concurrency to coordinate.
+- **Full id** = `<prefix>-<NN>` (e.g. `pvp-v1-03`). This is the `id:` value and what
+  `blocked_by` references. Cross-epic dependencies are allowed — reference the other
+  epic's full id (e.g. `blocked_by: [crew-exec-02]`); afk resolves it identically.
+
+Save each slice as:
 
 ```
-issues/0001-<slug>.md
-issues/0002-<slug>.md
+issues/pvp-v1-01-<slug>.md
+issues/pvp-v1-02-<slug>.md
 ...
 ```
 
-Use the template below. Number in dependency order — blockers first — so `afk` can pick the next unblocked one trivially.
+Use the template below.
 
 **If `gh` is set up and the user opts in:** also `gh issue create` for each slice, with the `ready-for-agent` label, in dependency order so the "Blocked by" field can reference real issue numbers.
 
@@ -89,11 +112,11 @@ Use the template below. Number in dependency order — blockers first — so `af
 
 ```markdown
 ---
-id: 0001
+id: pvp-v1-01        # <epic-prefix>-<NN>, namespaced per epic (see step 5) — never a global counter
 title: <short descriptive name>
 type: AFK            # or HITL
 status: open         # open | in_progress | done | stuck
-blocked_by: []       # list of issue ids, e.g. [0001, 0002]
+blocked_by: []       # list of issue ids, e.g. [pvp-v1-01, crew-exec-02]
 parent: docs/prd/<slug>.md   # path to the PRD (optional)
 work_item_id:        # numeric tracker ID (Azure Boards / Jira / etc.) — required if .claude/valk-config.md sets pr_skill
 pr_url:              # filled in by the PR skill after the slice is merged-ready (leave blank when authoring)
@@ -114,7 +137,7 @@ inlined for precision.
 
 ## Blocked by
 
-- 0001 (or "None — can start immediately")
+- pvp-v1-01 (or "None — can start immediately")
 ```
 
 **Frontmatter note:** `work_item_id` and `pr_url` are only meaningful when the repo has opted into a PR workflow via `<repo>/.claude/valk-config.md` (`pr_skill: to-azure-pr` or similar). For repos without that config, omit both fields and the rest of the workflow proceeds with the existing local-only behavior.
@@ -123,7 +146,7 @@ inlined for precision.
 
 Tell the user how many issues were created and where, and restate the parallel plan so they can
 fan the independent batches across worktrees:
-> "Created N issues in `issues/`. Parallel batches: [0001→0003] ∥ [0002→0004] — spin up a
+> "Created N issues in `issues/`. Parallel batches: [pvp-v1-01→pvp-v1-03] ∥ [pvp-v1-02→pvp-v1-04] — spin up a
 > `valk-worktree` per batch to run them concurrently, or **`!afk N`** to chew through them
 > sequentially in your own shell (the `!` prefix runs in your terminal so you own the loop
 > and see the `Proceed? [y/N]` confirmation). Ready to start TDD on the first unblocked one?"
@@ -145,8 +168,8 @@ If `docs/changes/` contains a `.md` file **newer than any file in `issues/`**, t
 
 - **Amend existing issue files in place** — do NOT regenerate the whole set. Update only the issues the change touches (scope, acceptance criteria, dependencies).
 - For requirements **dropped** by the change, set `status: obsolete` in the affected issue's frontmatter and add a one-line `Obsoleted by:` comment citing the change-note path. Do NOT delete the file — the trail matters.
-- For **new** requirements from the change, create new numbered issue files (continue the sequence; never renumber) with a frontmatter line `from_change: docs/changes/<ts>-<slug>.md`.
-- Append `- Δ <YYYY-MM-DD>: <one-line summary> (issues affected: 0003, 0007; new: 0012)` to `issues/CHANGES.md` (create on first revision).
+- For **new** requirements from the change, create new issue files continuing **this epic's** sequence (next `<prefix>-<NN>`; never renumber or reuse an id) with a frontmatter line `from_change: docs/changes/<ts>-<slug>.md`.
+- Append `- Δ <YYYY-MM-DD>: <one-line summary> (issues affected: pvp-v1-03, pvp-v1-07; new: pvp-v1-12)` to `issues/CHANGES.md` (create on first revision).
 - If the change invalidates the dependency graph in the PRD's parallel plan, re-run the "After saving" summary with the updated graph and **explicitly call out** which previously-parallel slices are now serial (or vice versa).
 
 If multiple change notes are newer than `issues/`, apply them in chronological order, one Δ entry each.

@@ -103,7 +103,7 @@ Rules:
 If `<repo>/.claude/valk-config.md` declares `test_skill: <name>`, the GREEN signal must come from invoking that skill — not from running whatever test command you infer from context. Read the config:
 
 ```bash
-~/Wenrwa\ Projects/Valkyrie/scripts/read-valk-config.sh test_skill
+read-valk-config.sh test_skill
 ```
 
 If the output is non-empty, invoke that skill and treat GREEN as "the skill returned success." If the output is empty, fall back to running tests the way you'd normally infer (current behavior).
@@ -143,7 +143,7 @@ When all acceptance criteria are checked off:
 
      ```bash
      git add -- <file> [<file> …]
-     git commit -m "<type>: <summary> (#000N)" \
+     git commit -m "<type>: <summary> (<issue-id>)" \
                 -m "Co-Authored-By: …" \
                 -- <file> [<file> …]
      ```
@@ -165,7 +165,7 @@ When all acceptance criteria are checked off:
      issue rather than force-pushing.
 
    The message still references the issue id (e.g.
-   `feat: add billing dashboard (#0003)`).
+   `feat: add billing dashboard (pvp-v1-03)`).
 
 2. **Manual test gate.** Before any flip to `status: done`, read the issue file
    and look for a `## Manual test checklist` section. Unit tests don't cover
@@ -181,7 +181,7 @@ When all acceptance criteria are checked off:
      unchecked items verbatim in chat, then call `AskUserQuestion` (**single-
      select**, NOT multiSelect) with exactly these three options:
 
-     - `question`: *"Issue 000N has N unchecked manual test items above. Manual
+     - `question`: *"Issue <issue-id> has N unchecked manual test items above. Manual
        checks catch what unit tests can't — UX feel, file rendering,
        interactions. Confirm before I flip status: done."*
      - **`"Manual checklist passes — flip status: done"`** —
@@ -208,12 +208,12 @@ When all acceptance criteria are checked off:
 3. **Read the repo's `.claude/valk-config.md`** to decide what "done" means:
 
    ```bash
-   PR_SKILL=$(~/Wenrwa\ Projects/Valkyrie/scripts/read-valk-config.sh pr_skill)
+   PR_SKILL=$(read-valk-config.sh pr_skill)
    ```
 
-   - **`PR_SKILL` is empty or `none`** → current behavior. Update issue frontmatter `status: done`. Tell the user "Issue 000N done."
+   - **`PR_SKILL` is empty or `none`** → current behavior. Update issue frontmatter `status: done`. Tell the user "Issue <issue-id> done."
    - **`PR_SKILL` is set** (e.g. `to-azure-pr`) → invoke that skill via the Skill tool. The skill pushes the branch, opens the PR, waits for CI, and returns a JSON result. Then:
-     - `ready_for_review: true` → write the `pr_url` into the issue frontmatter alongside `status: done`. Tell the user: "Issue 000N done. PR: <url>"
+     - `ready_for_review: true` → write the `pr_url` into the issue frontmatter alongside `status: done`. Tell the user: "Issue <issue-id> done. PR: <url>"
      - `ready_for_review: false` → leave issue `status: open` and write `stuck_reason: <ci_status>` into the frontmatter. Tell the user what blocked the green signal.
    - **`PR_SKILL` is set but the named skill is not installed** → STOP. Tell the user: "Config requires /<name> but it's not available. Install it or set pr_skill: none in .claude/valk-config.md."
 

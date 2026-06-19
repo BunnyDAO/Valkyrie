@@ -1,11 +1,18 @@
 {
-  "_note": "claude: cost-helper prefers the CLI's own total_cost_usd (cost_source=reported). codex (run with --json): cost-helper computes cost_source=computed from parsed token usage x the openai rates below, so those values ARE the bill — keep them current. anthropic values are the fallback for claude when no result event is emitted (crash/kill/timeout). Verify against the sources before trusting absolute dollars: issue 0006 (HITL).",
-  "_last_verified": "PLACEHOLDER",
+  "_note": "claude: cost-helper prefers the CLI's own total_cost_usd (cost_source=reported). codex (run with --json): cost-helper computes cost_source=computed from parsed token usage x the openai rates below, so those values ARE the bill — keep them current. anthropic values are the fallback for claude when no result event is emitted (crash/kill/timeout). Verify against the sources before trusting absolute dollars: issue 0006 (HITL). Opus 4.8 added 2026-06-18 (input $5 / output $25 per MTok + standard 1.25x/2x/0.1x cache multipliers); WITHOUT this row a claude opus run normalizes to claude-opus-4-8, misses the table, and afk aborts with 'cost tracking failed'. The claude-opus-4-7 row predates the $5/$25 Opus repricing and is overstated (15/75) — correct or drop it under issue 0006.",
+  "_last_verified": "2026-06-18 (opus-4-8 / sonnet-4-6 / haiku-4-5 vs model catalog; opus-4-7 row STALE)",
   "_sources": [
     "https://www.anthropic.com/pricing",
     "https://platform.openai.com/docs/pricing"
   ],
   "anthropic": {
+    "claude-opus-4-8": {
+      "input_per_mtok":           5.00,
+      "output_per_mtok":         25.00,
+      "cache_write_5m_per_mtok":  6.25,
+      "cache_write_1h_per_mtok": 10.00,
+      "cache_read_per_mtok":      0.50
+    },
     "claude-opus-4-7": {
       "input_per_mtok":          15.00,
       "output_per_mtok":         75.00,
