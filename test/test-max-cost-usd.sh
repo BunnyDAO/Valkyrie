@@ -76,14 +76,14 @@ rm -rf "$H" "$W"
 
 # ---------------------------------------------------------------------------
 # 3. Cost cap fires at boundary; iter 3 should NOT run.
-#    Each iter $0.0525; cap $0.10 → after iter 2 cumulative ≈ $0.105 ≥ cap.
+#    Each iter $0.0175; cap $0.03 → after iter 2 cumulative $0.035 ≥ cap.
 # ---------------------------------------------------------------------------
 H="$(mktemp -d)"; W="$(new_workdir)"; OUT="$W/run.out"
 make_fake_home "$H"
 extra_issue "$W" 0003
 extra_issue "$W" 0004
 extra_issue "$W" 0005
-STUB_FIXTURE="$COST_FIX/opus-simple.log" run_ra "$RALPH_AFK" 5 --max-cost-usd 0.10
+STUB_FIXTURE="$COST_FIX/opus-simple.log" run_ra "$RALPH_AFK" 5 --max-cost-usd 0.03
 [ $? -eq 0 ] || fail "case 3: nonzero exit"
 assert_match "$OUT" "reason: cost cap hit"
 grep -q "iter 2/5 done" "$OUT" || fail "case 3: iter 2 should have run"

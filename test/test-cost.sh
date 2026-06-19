@@ -26,9 +26,9 @@ make_fake_home() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Known fixture: opus-simple → 1000 input + 500 output @ placeholder rates
-#    input_per_mtok=15, output_per_mtok=75
-#    cost = 1000/1e6*15 + 500/1e6*75 = 0.015 + 0.0375 = 0.0525
+# 1. Known fixture: opus-simple → 1000 input + 500 output @ opus-4-7 rates
+#    input_per_mtok=5, output_per_mtok=25
+#    cost = 1000/1e6*5 + 500/1e6*25 = 0.005 + 0.0125 = 0.0175
 # ---------------------------------------------------------------------------
 H="$(mktemp -d)"; OUT="$H/run.out"
 make_fake_home "$H"
@@ -37,14 +37,14 @@ HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/opus-simple.log" >"$OUT" 2>&1
 grep -q "model=claude-opus-4-7" "$OUT" || fail "case 1: model"
 grep -q "input=1000"             "$OUT" || fail "case 1: input"
 grep -q "output=500"              "$OUT" || fail "case 1: output"
-grep -q "cost_usd=0.0525"         "$OUT" || { fail "case 1: cost — got $(cat "$OUT")"; }
+grep -q "cost_usd=0.0175"         "$OUT" || { fail "case 1: cost — got $(cat "$OUT")"; }
 rm -rf "$H"
 
 # ---------------------------------------------------------------------------
 # 2. Cache fields broken into 5m/1h are summed correctly.
 #    With cache: cw5m=2000, cw1h=1000, cread=4000
-#    cost = 0.0525 + 2000/1e6*18.75 + 1000/1e6*30 + 4000/1e6*1.5
-#         = 0.0525 + 0.0375 + 0.03 + 0.006 = 0.126
+#    cost = 0.0175 + 2000/1e6*6.25 + 1000/1e6*10 + 4000/1e6*0.5
+#         = 0.0175 + 0.0125 + 0.01 + 0.002 = 0.042
 # ---------------------------------------------------------------------------
 H="$(mktemp -d)"; OUT="$H/run.out"
 make_fake_home "$H"
@@ -53,14 +53,14 @@ HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/opus-with-cache.log" >"$OUT" 2>&1
 grep -q "cw5m=2000"  "$OUT" || fail "case 2: cw5m"
 grep -q "cw1h=1000"  "$OUT" || fail "case 2: cw1h"
 grep -q "cread=4000" "$OUT" || fail "case 2: cread"
-grep -q "cost_usd=0.126" "$OUT" || fail "case 2: cost — got $(cat "$OUT")"
+grep -q "cost_usd=0.042" "$OUT" || fail "case 2: cost — got $(cat "$OUT")"
 rm -rf "$H"
 
 # ---------------------------------------------------------------------------
 # 3. Flat cache_creation_input_tokens is attributed entirely to cw5m.
 #    cache_creation = 3000, cread = 4000
-#    cost = 0.0525 + 3000/1e6*18.75 + 4000/1e6*1.5
-#         = 0.0525 + 0.05625 + 0.006 = 0.11475
+#    cost = 0.0175 + 3000/1e6*6.25 + 4000/1e6*0.5
+#         = 0.0175 + 0.01875 + 0.002 = 0.03825
 # ---------------------------------------------------------------------------
 H="$(mktemp -d)"; OUT="$H/run.out"
 make_fake_home "$H"
@@ -68,7 +68,7 @@ HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/opus-flat-cache.log" >"$OUT" 2>&1
 [ $? -eq 0 ] || fail "case 3: nonzero exit"
 grep -q "cw5m=3000" "$OUT" || fail "case 3: flat → cw5m"
 grep -q "cw1h=0"    "$OUT" || fail "case 3: flat → cw1h zero"
-grep -q "cost_usd=0.11475" "$OUT" || fail "case 3: cost — got $(cat "$OUT")"
+grep -q "cost_usd=0.03825" "$OUT" || fail "case 3: cost — got $(cat "$OUT")"
 rm -rf "$H"
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ make_fake_home "$H"
 HOME="$H" "$RALPH_AFK" --debug-cost "$COST_FIX/opus-date-suffix.log" >"$OUT" 2>&1
 [ $? -eq 0 ] || fail "case 4: nonzero exit"
 grep -q "model=claude-opus-4-7" "$OUT" || fail "case 4: model not normalized — got $(cat "$OUT")"
-grep -q "cost_usd=0.0525"        "$OUT" || fail "case 4: cost"
+grep -q "cost_usd=0.0175"        "$OUT" || fail "case 4: cost"
 rm -rf "$H"
 
 # ---------------------------------------------------------------------------
