@@ -5,6 +5,9 @@
   "skills": [
     "./skills/valk",
     "./skills/grill-with-docs",
+    "./skills/to-domain",
+    "./skills/to-product-map",
+    "./skills/to-intent",
     "./skills/to-prd",
     "./skills/to-issues",
     "./skills/tdd",
