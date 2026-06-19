@@ -250,6 +250,22 @@ if [ ! -d "$ISSUES_DIR" ]; then
   exit 1
 fi
 
+# Pre-flight: refuse to start on a broken issue graph. afk resolves blocked_by
+# by id-prefix glob (first match wins), so a duplicate id mis-routes a
+# dependency, a dangling/ambiguous dep permanently blocks an issue, and a cycle
+# starves the whole loop — all silently. valk-issues lint catches them up front.
+# Override with VALK_SKIP_ISSUE_LINT=1.
+if [ "${VALK_SKIP_ISSUE_LINT:-0}" != "1" ]; then
+  VALK_ISSUES="${VALK_ISSUES:-$SCRIPT_DIR/valk-issues.py}"
+  [ -f "$VALK_ISSUES" ] || VALK_ISSUES="$HOME/.claude/valkyrie/valk-issues.py"
+  if [ -f "$VALK_ISSUES" ]; then
+    if ! python3 "$VALK_ISSUES" lint --dir "$ISSUES_DIR" >&2; then
+      echo "afk: issue-graph lint failed (above). Fix issues/, or set VALK_SKIP_ISSUE_LINT=1 to bypass." >&2
+      exit 1
+    fi
+  fi
+fi
+
 # Time accounting. DEADLINE_TS is the unix timestamp at which --max-hours is up.
 START_TS="$(date +%s)"
 DEADLINE_TS="$(awk -v s="$START_TS" -v h="$MAX_HOURS" 'BEGIN{printf "%d", s + h*3600}')"
