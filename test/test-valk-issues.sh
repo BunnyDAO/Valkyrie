@@ -55,6 +55,21 @@ ids="$(run ready --json | ready_ids)"
 has "$ids" "pvp-v1-02" && { echo "FAIL: pvp-v1-02 ready while dep open: [$ids]"; exit 1; }
 has "$ids" "pvp-v1-01" || { echo "FAIL: pvp-v1-01 should be ready (no deps, open): [$ids]"; exit 1; }
 
+# --- namespacing contract: two concurrent epics, identical NN, no collision -
+# This is the guarantee the per-epic id change buys: two /valk flows sharing one
+# issues/ dir can number from 01 independently and never clash (the global
+# 0001-counter scheme collided here — see the duplicate-id case below).
+mkissues
+issue "pvp-v1-01-a.md" pvp-v1-01 done "[]"
+issue "pvp-v1-02-b.md" pvp-v1-02 open "[pvp-v1-01]"
+issue "crew-exec-01-c.md" crew-exec-01 done "[]"
+issue "crew-exec-02-d.md" crew-exec-02 open "[crew-exec-01]"   # same '-01'/'-02' as pvp-v1
+out="$(run lint)"; rc=$?
+[ "$rc" -eq 0 ] || { echo "FAIL: cross-epic same-NN ids must not collide (rc=$rc): $out"; exit 1; }
+ids="$(run ready --json | ready_ids)"
+has "$ids" "pvp-v1-02"   || { echo "FAIL: pvp-v1-02 should be ready: [$ids]"; exit 1; }
+has "$ids" "crew-exec-02" || { echo "FAIL: crew-exec-02 should be ready: [$ids]"; exit 1; }
+
 # --- duplicate id ----------------------------------------------------------
 mkissues
 issue "0039-crew.md" 0039 open "[]"
