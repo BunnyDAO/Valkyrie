@@ -12,7 +12,7 @@ Adapted from mattpocock/skills with Valkyrie stage tracking.
 Mark the stage so the statusline shows DESIGN:
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set design
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set design
 ```
 
 ## Intent Lock — first, before any grilling

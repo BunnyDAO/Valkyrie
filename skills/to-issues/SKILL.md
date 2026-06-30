@@ -10,7 +10,7 @@ Adapted from mattpocock/skills with a local-first default so it works without a 
 ## On entry
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set issues
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set issues
 ```
 
 ## Process

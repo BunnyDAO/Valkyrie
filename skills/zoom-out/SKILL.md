@@ -10,7 +10,7 @@ Adapted from mattpocock/skills.
 ## On entry
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set zoom
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set zoom
 ```
 
 (Stage will be restored to whatever it was before, or to `idle`, when this completes.)
@@ -33,7 +33,7 @@ End with one short question:
 ## On exit
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py clear
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" clear
 ```
 
 (Or restore to the previous stage if the orchestrator passed it in.)

@@ -10,7 +10,7 @@ Adapted from mattpocock/skills with Valkyrie stage tracking.
 ## On entry
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set tdd
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set tdd
 ```
 
 **Cost discipline.** The main session orchestrates the red-green-refactor loop and owns the

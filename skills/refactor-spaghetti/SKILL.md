@@ -10,7 +10,7 @@ Adapted from mattpocock/skills `improve-codebase-architecture`. Surface architec
 ## On entry
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set refactor
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set refactor
 ```
 
 ## Vocabulary (use these terms exactly)
@@ -71,5 +71,5 @@ Side effects happen inline as decisions crystallize:
 ## On exit
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py clear
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" clear
 ```

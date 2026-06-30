@@ -107,7 +107,7 @@ one fresh, single-issue session per slice.)
 
 1. Read the current stage by running:
    ```bash
-   python3 ~/.claude/valkyrie/stage.py get
+   python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" get
    ```
 2. Tell the user where they are in the workflow in **one short sentence**.
 3. Decide what to do next based on the rules below.
@@ -127,13 +127,13 @@ one fresh, single-issue session per slice.)
 When you move to a new stage, write the marker BEFORE invoking the sub-skill:
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set design     # before grill-with-docs
-python3 ~/.claude/valkyrie/stage.py set prd        # before to-prd
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set design     # before grill-with-docs
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set prd        # before to-prd
 # (to-prd itself sets `prd-review` and runs the approval gate — you do NOT
 #  set `issues` until it reports the user substantively approved)
-python3 ~/.claude/valkyrie/stage.py set issues     # before to-issues — ONLY after PRD approval
-python3 ~/.claude/valkyrie/stage.py set tdd        # before tdd
-python3 ~/.claude/valkyrie/stage.py clear          # when done
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set issues     # before to-issues — ONLY after PRD approval
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set tdd        # before tdd
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" clear          # when done
 ```
 
 Then **apply the Crew shim (below)** to decide what actually runs this stage, and do not narrate the stage write to the user — keep it silent; the statusline shows them.

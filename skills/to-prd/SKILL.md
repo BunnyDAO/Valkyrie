@@ -10,7 +10,7 @@ Adapted from mattpocock/skills with Valkyrie stage tracking and a local-first de
 ## On entry
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set prd
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set prd
 ```
 
 ## What to do
@@ -87,7 +87,7 @@ The PRD is the contract. Every downstream issue and every line of TDD code inher
 ### 1. Move to the review stage
 
 ```bash
-python3 ~/.claude/valkyrie/stage.py set prd-review
+python3 "$(for p in .claude/valkyrie/stage.py "$HOME/.claude/valkyrie/stage.py" "$HOME/.claude/valk/stage.py"; do [ -f "$p" ] && echo "$p" && break; done)" set prd-review
 ```
 
 The statusline now shows **▶ REVIEW-PRD** — the signal that the human owes the PRD a read before anything proceeds.
