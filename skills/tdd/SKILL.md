@@ -1,5 +1,6 @@
 ---
 name: tdd
+version: 0.1.0
 description: Test-driven development with the red-green-refactor loop, using vertical slices (tracer bullets). Use when user wants to build features or fix bugs using TDD, mentions red-green-refactor, wants integration tests, asks for test-first development, or when /valk routes here at the TDD stage.
 ---
 

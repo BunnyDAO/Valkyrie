@@ -1,5 +1,6 @@
 ---
 name: to-product-map
+version: 0.1.0
 description: Author or update an umbrella PRODUCT-MAP.md for a product assembled from multiple repos — member repos, build/assembly order, and cross-repo contracts. Use when the user types /to-product-map, when a change spans repos, or when a multi-repo product needs its cross-repo bounds written down. Single-repo projects do not need this.
 ---
 

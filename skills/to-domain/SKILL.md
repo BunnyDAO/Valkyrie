@@ -1,5 +1,6 @@
 ---
 name: to-domain
+version: 0.1.0
 description: Author or update a repo's DOMAIN.md — its purpose, system integration map, installer/assembly relationship, legacy constraints, and pain points. Use when the user types /to-domain, asks to capture the domain or bounds of a repo, or when a grilling session needs explicit domain bounds. Distinct from CONTEXT.md, which is the glossary.
 ---
 

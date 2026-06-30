@@ -1,5 +1,6 @@
 ---
 name: grill-with-docs
+version: 0.1.0
 description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan, get grilled on their design, says "grill me", or when /valk routes here at the DESIGN stage.
 ---
 

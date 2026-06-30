@@ -1,5 +1,6 @@
 ---
 name: zoom-out
+version: 0.1.0
 description: Step back from low-level code to give a higher-level map of how a module fits into the bigger picture — its callers, its collaborators, its place in the system. Use when you're unfamiliar with a section of code, when you've been zoomed in too long, or when the user types /zoom-out.
 ---
 

@@ -1,5 +1,6 @@
 ---
 name: refactor-spaghetti
+version: 0.1.0
 description: Find architectural friction in a codebase and propose deepening opportunities — refactors that turn shallow modules into deep ones, with leverage and locality. Use when user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled code, clean up spaghetti, or types /refactor-spaghetti.
 ---
 

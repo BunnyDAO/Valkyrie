@@ -1,5 +1,6 @@
 ---
 name: to-prd
+version: 0.1.0
 description: Turn the current conversation context into a PRD and save it to docs/prd/ (or publish to the issue tracker if one is configured). Use after a grill-with-docs session, when the user says "turn this into a PRD", or when /valk routes here at the PRD stage.
 ---
 

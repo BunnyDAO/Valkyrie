@@ -1,5 +1,6 @@
 ---
 name: to-issues
+version: 0.1.0
 description: Break a plan, spec, or PRD into independently-grabbable issues using vertical slices (tracer bullets), saved locally to issues/ as numbered markdown files with dependency metadata, or published to the issue tracker if one is configured. Use after /to-prd, when user wants to convert a plan into tickets, or when /valk routes here at the ISSUES stage.
 ---
 

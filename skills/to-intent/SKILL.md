@@ -1,5 +1,6 @@
 ---
 name: to-intent
+version: 0.1.0
 description: Author a per-task intent brief — the crystal-clear WHY, scope, success criteria, and trade-offs for one change — saved to docs/intent/<slug>.md. The agent is forbidden from filling gaps with inference; every unknown is a question. Use when the user types /to-intent, wants to pin down intent before designing, or when the DESIGN Intent Lock offers to persist it.
 ---
 
