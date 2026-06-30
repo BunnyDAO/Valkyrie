@@ -1,0 +1,37 @@
+name: valkyrie
+version: 0.1.0
+description: Hard-enforced design-first AI coding workflow
+
+requires:
+  cli:
+    - python3
+    - git
+  optional_cli:
+    - gh          # GitHub CLI — used by to-issues for PR creation
+    - afk         # Autonomous loop runner — installed by valkyrie:setup
+    - valk-worktree  # Per-flow git worktree isolation — installed by valkyrie:setup
+    - valk-land      # Integrate-back companion — installed by valkyrie:setup
+    - valk-revisit   # Mid-stream requirement rewind — installed by valkyrie:setup
+    - read-valk-config.sh   # Inner-loop config reader — installed by valkyrie:setup
+    - parse-loop-verdict.sh # Loop verdict parser — installed by valkyrie:setup
+
+state:
+  # stage.py writes workflow stage to $CLAUDE_HOME/valkyrie/stage.json.
+  # This departs from the .sc/<package>/ convention because the stage must be
+  # readable by shell hooks (valk-guard.sh) that fire outside the plugin context.
+  # The valkyrie:setup skill wires the correct CLAUDE_HOME path on install.
+  storage: "$CLAUDE_HOME/valkyrie/"
+  ttl: session
+
+skills:
+  - valk
+  - grill-with-docs
+  - to-domain
+  - to-product-map
+  - to-intent
+  - to-prd
+  - to-issues
+  - tdd
+  - zoom-out
+  - refactor-spaghetti
+  - setup

@@ -1,0 +1,34 @@
+skills:
+  valkyrie/valk:
+    version: 0.1.0
+    path: skills/valk/SKILL.md
+  valkyrie/grill-with-docs:
+    version: 0.1.0
+    path: skills/grill-with-docs/SKILL.md
+  valkyrie/to-domain:
+    version: 0.1.0
+    path: skills/to-domain/SKILL.md
+  valkyrie/to-product-map:
+    version: 0.1.0
+    path: skills/to-product-map/SKILL.md
+  valkyrie/to-intent:
+    version: 0.1.0
+    path: skills/to-intent/SKILL.md
+  valkyrie/to-prd:
+    version: 0.1.0
+    path: skills/to-prd/SKILL.md
+  valkyrie/to-issues:
+    version: 0.1.0
+    path: skills/to-issues/SKILL.md
+  valkyrie/tdd:
+    version: 0.1.0
+    path: skills/tdd/SKILL.md
+  valkyrie/zoom-out:
+    version: 0.1.0
+    path: skills/zoom-out/SKILL.md
+  valkyrie/refactor-spaghetti:
+    version: 0.1.0
+    path: skills/refactor-spaghetti/SKILL.md
+  valkyrie/setup:
+    version: 0.1.0
+    path: skills/setup/SKILL.md
