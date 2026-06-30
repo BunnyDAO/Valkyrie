@@ -2,6 +2,11 @@
   "name": "valkyrie",
   "version": "0.1.0",
   "description": "Hard-enforced design-first AI coding workflow: grill-with-docs → to-prd → to-issues → tdd, with a stage-aware statusline and an afk loop runner.",
+  "author": {
+    "name": "Konica Minolta Sensing Americas",
+    "email": "Erik.Hauan@radiantvs.com"
+  },
+  "keywords": ["valkyrie", "workflow", "design-first", "tdd", "prd", "afk", "statusline", "kmsa"],
   "skills": [
     "./skills/valk",
     "./skills/grill-with-docs",
@@ -12,6 +17,19 @@
     "./skills/to-issues",
     "./skills/tdd",
     "./skills/zoom-out",
-    "./skills/refactor-spaghetti"
+    "./skills/refactor-spaghetti",
+    "./skills/setup"
+  ],
+  "scripts": [
+    "./statusline/stage.py",
+    "./statusline/statusline.py",
+    "./scripts/cost-helper.py",
+    "./scripts/telemetry-helper.py",
+    "./scripts/rates.json",
+    "./scripts/crew-shim",
+    "./scripts/valk-guard.sh",
+    "./scripts/valk-tdd-gate.sh",
+    "./scripts/valk-telemetry.sh",
+    "./scripts/valk-loop-gate.sh"
   ]
 }
